@@ -98,13 +98,17 @@ def _looks_encryption_related(exc: BaseException) -> bool:
 
 
 def _open_pdf(path: str | os.PathLike[str], password: str) -> pikepdf.Pdf:
-    """Open a PDF with one password candidate."""
-    # allow_overwriting_input lets the pipeline save back onto the input file;
-    # suppress_warnings keeps noisy but harmless qpdf messages out of runs.
+    """Open a PDF read-only with one password candidate.
+
+    The pipeline never writes back to the input: every result goes to a temp
+    file in the destination directory and is promoted with ``os.replace``.
+    Opening read-only therefore avoids needing write permission on the source,
+    which is what fails for read-only media, sharing locks and OneDrive/cloud
+    placeholders.
+    """
     return pikepdf.open(
         path,
         password=password,
-        allow_overwriting_input=True,
         suppress_warnings=True,
     )
 

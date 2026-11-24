@@ -266,6 +266,9 @@ def compress_pdf_file(
         result.protection_kind = "unsupported"
         result.required_password = True
         result.error_message = t("errors.protection_unsupported")
+    except PermissionError as exc:
+        blocked = getattr(exc, "filename", None) or str(source)
+        result.error_message = t("errors.permission_denied", path=blocked)
     except SigningError as exc:
         result.error_message = f"{t('errors.signing_failed')}: {exc}"
     except Exception as exc:  # FR-PIPE-3: never leak an exception to callers.

@@ -8,6 +8,14 @@ All notable changes to OzemPDF are documented here. The format follows
 
 ### Changed
 
+- **Electron pinned to 38.0.0.** Electron 45 aborts in Chromium's sandbox on this Windows 11 build
+  before the main process runs; Electron 38 launches directly, so `OzemPDF.exe` no longer needs the
+  compatibility launcher on ordinary machines. The launcher stays for hosts that still block the
+  sandbox.
+- **Input PDFs are opened read-only.** The pipeline never writes back to the source (every result is
+  a temp file promoted with an atomic replace), so requesting write access was unnecessary and
+  failed for OneDrive/cloud placeholders, locked files and read-only media. Permission failures now
+  say which path was denied and suggest closing the app or downloading the cloud file first.
 - **Windows is now genuinely portable: one ZIP, no installer.** The NSIS installer and the
   NSIS-based portable self-extractor are gone (`npm run dist` builds only
   `OzemPDF-<version>-win.zip`). Nothing is extracted to the system temp directory and no uninstall

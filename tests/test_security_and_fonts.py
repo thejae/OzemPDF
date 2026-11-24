@@ -93,6 +93,41 @@ def test_open_password_without_credential_is_reported_not_guessed(assets, tmp_pa
     assert not output.exists()
 
 
+def test_input_is_opened_read_only(assets, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never request write access to the source: cloud/read-only files break."""
+    from ozempdf.engine import unlock
+
+    real_open = pikepdf.open
+    seen: dict = {}
+
+    def recording_open(*args, **kwargs):
+        seen.update(kwargs)
+        return real_open(*args, **kwargs)
+
+    monkeypatch.setattr(unlock.pikepdf, "open", recording_open)
+    pdf, _stats = open_and_unlock_pdf(assets.ui)
+    pdf.close()
+    assert not seen.get("allow_overwriting_input", False)
+
+
+def test_permission_denied_is_actionable(
+    assets, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A locked/cloud-only input produces a clear message, not a raw errno."""
+    from ozempdf.engine import unlock
+
+    def denied(*args, **kwargs):
+        raise PermissionError(13, "Permission denied", str(assets.ui))
+
+    monkeypatch.setattr(unlock.pikepdf, "open", denied)
+    output = tmp_path / "denied.pdf"
+    result = compress_pdf_file(assets.ui, output, CompressionConfig.from_preset("balanced"))
+    assert result.success is False
+    assert "Permission denied" in result.error_message
+    assert str(assets.ui) in result.error_message
+    assert not output.exists()
+
+
 def test_protection_classification(assets) -> None:
     assert inspect_protection(assets.ui).kind is ProtectionKind.NONE
     assert inspect_protection(assets.signed).kind is ProtectionKind.PERMISSIONS

@@ -150,6 +150,8 @@ class AppState:
 
                 with pikepdf.open(path, password=password or "") as pdf:
                     pages = len(pdf.pages)
+            except PermissionError:
+                error = t("errors.permission_denied", path=path)
             except Exception as exc:
                 if not locked:
                     error = t("errors.read_failed")

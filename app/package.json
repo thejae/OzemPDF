@@ -12,7 +12,7 @@
     "dist": "electron-builder --win zip"
   },
   "devDependencies": {
-    "electron": "^45.4.1",
+    "electron": "^38.0.0",
     "electron-builder": "^26.0.12"
   },
   "build": {
@@ -31,7 +31,9 @@
       {
         "from": "../dist/engine",
         "to": "engine",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "extraFiles": [
@@ -45,18 +47,28 @@
       }
     ],
     "win": {
-      "target": ["zip"],
+      "target": [
+        "zip"
+      ],
       "icon": "build/icon.ico"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.productivity",
       "icon": "build/icon.png"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Office",
       "icon": "build/icon.png"
     }
+  },
+  "allowScripts": {
+    "electron@38.0.0": true
   }
 }

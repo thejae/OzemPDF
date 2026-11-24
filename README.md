@@ -82,9 +82,11 @@ The Windows build is a single **portable ZIP**: `app/release/OzemPDF-0.3.2-win.z
 installer, no registry entry, no Program Files copy and no uninstaller. Extract it anywhere
 writable (for example `D:\OzemPDF`) and run from there; do not run it from inside the ZIP.
 
-1. `OzemPDF.exe` — the desktop app. On a normal PC extract-and-run is the whole installation.
+1. `OzemPDF.exe` — the desktop app. On a normal PC, extract the ZIP to a writable folder (Desktop,
+   `D:\OzemPDF`, a USB stick) and double-click this file; no command line or shortcut flags needed.
+   Do not run it from inside the ZIP, from Program Files, or from a protected/build folder.
 2. `Start OzemPDF (compatibility).cmd` — the same desktop app with Chromium's sandbox disabled, for
-   managed or containerised hosts where `OzemPDF.exe` exits before its main process starts.
+   the rare host that still blocks the Electron sandbox.
 3. `Start OzemPDF in browser.cmd` — launches the bundled Python engine and opens the complete
    interface in the default browser. No Electron, no Python installation and no installer; useful
    where the host blocks the Electron sandbox entirely.
