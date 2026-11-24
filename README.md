@@ -1,6 +1,6 @@
 # OzemPDF
 
-**v0.3.2** — surgical lossless and visually-lossless PDF slimming.
+**v0.3.3** — surgical lossless and visually-lossless PDF slimming.
 
 OzemPDF makes PDFs smaller without re-distilling pages. It never rasterizes page content and
 never rewrites vector or text operators; it performs object-level surgery on embedded images,
@@ -13,7 +13,21 @@ font programs, deflate streams, metadata and the cross-reference structure.
 - **The interface is plain HTML/CSS/JS**, served by the Python engine and wrapped by an Electron
   window on Windows, macOS and Linux.
 
+![Dropping PDFs on the working table](docs/screenshots/step1.png)
+
 ![The queue and compression card](docs/screenshots/step2.png)
+
+## Results
+
+Each run reports where the bytes went, per file or for the whole batch, and marks documents whose
+protection was removed.
+
+![Batch results with the savings breakdown](docs/screenshots/step3.png)
+
+The wipe-slider inspector shows the original and the slimmed page at the same zoom, which makes
+"visually lossless" checkable instead of a claim:
+
+![Wipe-slider quality inspector](docs/screenshots/inspector.png)
 
 ## Why another PDF compressor
 
@@ -78,7 +92,7 @@ there as expected.
 
 ### Windows: portable, no installer
 
-The Windows build is a single **portable ZIP**: `app/release/OzemPDF-0.3.2-win.zip`. There is no
+The Windows build is a single **portable ZIP**: `app/release/OzemPDF-0.3.3-win.zip`. There is no
 installer, no registry entry, no Program Files copy and no uninstaller. Extract it anywhere
 writable (for example `D:\OzemPDF`) and run from there; do not run it from inside the ZIP.
 
@@ -138,7 +152,9 @@ does not need one — Adobe asks for a password only to *change* permissions, wh
 itself is readable with the empty password every conforming reader tries. Restricting permissions
 is not encryption of the content, and removing those restrictions is not decryption.
 
-![Protection states and the unlocked count in the results band](docs/screenshots/protection.png)
+Removed protection is reported, never silent: the queue marks locked and permission-restricted
+documents, and the results band counts what was unlocked without a password (visible in the results
+screenshot above).
 
 ## Configuration and data
 

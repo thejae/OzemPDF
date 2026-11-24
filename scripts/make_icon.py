@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-ACCENT = (185, 59, 27, 255)
+ACCENT = (27, 74, 128, 255)
 PAPER = (244, 243, 238, 255)
 WHITE = (255, 255, 255, 255)
 
@@ -30,6 +30,7 @@ def render(size: int = 512) -> Image.Image:
     left, right = round(176 * scale), round(336 * scale)
     top, bottom = round(128 * scale), round(384 * scale)
     fold = round(64 * scale)
+    # Page with a chamfered top-right corner; the chamfer itself reads as the fold.
     draw.polygon(
         [
             (left, top),
@@ -40,15 +41,18 @@ def render(size: int = 512) -> Image.Image:
         ],
         fill=WHITE,
     )
-    # Folded corner: remove the triangle so the paper reads as a document.
-    draw.polygon(
-        [(right - fold, top), (right, top + fold), (right - fold, top + fold)],
+    # A single hairline from the chamfer edge into the page reads as a folded corner
+    # without turning into mush at 16 px.
+    draw.line(
+        [(right - fold, top), (right - fold, top + fold), (right, top + fold)],
         fill=ACCENT,
+        width=max(2, round(6 * scale)),
+        joint="curve",
     )
     line = max(2, round(10 * scale))
     bar_left = round(left + 32 * scale)
     bar_width = round(right - left - 64 * scale)
-    for offset, width in ((0.44, 0.56), (0.58, 0.42), (0.72, 0.28)):
+    for offset, width in ((0.46, 0.62), (0.60, 0.46), (0.74, 0.30)):
         bar_top = round(bottom * offset + 12 * scale)
         draw.rounded_rectangle(
             [bar_left, bar_top, bar_left + round(bar_width * width), bar_top + line],

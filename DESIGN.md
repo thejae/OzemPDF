@@ -4,34 +4,41 @@
 
 ## World
 
-**The drafting table.** OzemPDF is a precision instrument that sits on a document workstation. The interface borrows the material language of a drafting surface: warm paper, hairline rules, a faint measured grid, tabular figures, and a single vermilion mark that shows where the tool is cutting. Nothing is decorated; everything is measured. The queue and the numbers are the composition; the chrome recedes into hairlines.
+**The drafting table.** OzemPDF is a precision instrument that sits on a document workstation. The interface borrows the material language of a drafting surface: warm paper, hairline rules, a faint measured grid, tabular figures, and a single ink-blue mark that shows where the tool is cutting. Nothing is decorated; everything is measured. The queue and the numbers are the composition; the chrome recedes into hairlines.
 
 Mode: **Operate**. Every screen serves a task in progress. Familiar desktop-document conventions (three-step stepper, table with sticky head, footer action dock) earn their place; the point of view lives in the typography, the measured grid, and the restraint of one accent.
 
 ## Palette
 
-Tokens are defined once in `tokens.css` and consumed by both themes.
+Tokens are defined once in `styles.css` (`:root` and `[data-theme='dark']`) and consumed by both themes.
 
 | Token | Light | Dark | Role |
 | --- | --- | --- | --- |
-| `--paper` | `#F4F3EE` | `#131412` | app canvas |
-| `--surface` | `#FBFBF8` | `#1A1B18` | content surface |
-| `--raised` | `#FFFFFF` | `#222320` | rows, controls, floating layers |
-| `--ink` | `#1B1B17` | `#EDECE6` | primary text |
-| `--ink-2` | `#55564E` | `#B4B5AC` | secondary text |
-| `--ink-3` | `#6E6F66` | `#96978E` | muted text, labels (AA on its surface) |
-| `--rule` | `#DCDAD1` | `#33352E` | hairlines |
-| `--rule-strong` | `#B9B7AC` | `#4C4E45` | dashed drop border, separators |
-| `--accent` | `#C2401F` | `#F0653F` | primary action, active step, divider |
-| `--accent-soft` | `#F6E4DC` | `#3A241C` | accent tint |
-| `--success` | `#1D6B45` | `#63C695` | savings, completed |
-| `--success-soft` | `#E4F0E7` | `#1D2E24` | completion tint |
-| `--warning` | `#8A5A12` | `#E2AA4C` | partial runs |
-| `--warning-soft` | `#F6EDD9` | `#332A18` | warning tint |
-| `--danger` | `#A32B1F` | `#F0806F` | errors, destructive |
-| `--danger-soft` | `#F7E4E0` | `#3A211D` | error tint |
+| `--paper` | `#F2F1EC` | `#111210` | app canvas |
+| `--surface` | `#FAFAF6` | `#171815` | content surface |
+| `--raised` | `#FFFFFF` | `#1F211D` | rows, controls, floating layers |
+| `--raised-2` | `#F5F4EF` | `#24261F` | recessed tracks, table head |
+| `--ink` | `#1B1B17` | `#ECEBE4` | primary text |
+| `--ink-2` | `#54554D` | `#B3B4AA` | secondary text |
+| `--ink-3` | `#6B6C63` | `#96978D` | muted text, labels (AA on its surface) |
+| `--rule` | `#DBD9D0` | `#30322B` | hairlines |
+| `--rule-strong` | `#B8B6AB` | `#4A4C42` | dashed drop border, separators |
+| `--accent` | `#1B4A80` | `#63B3ED` | primary action, active step, divider |
+| `--accent-hover` | `#143A67` | `#86C7F2` | pressed/hover accent |
+| `--accent-ink` | `#FFFFFF` | `#0A1622` | text on an accent fill |
+| `--accent-soft` | `#E6EDF7` | `#16283A` | accent tint |
+| `--success` | `#1C6742` | `#5EC191` | savings, completed |
+| `--success-soft` | `#E3EFE6` | `#1C2E24` | completion tint |
+| `--warning` | `#7E5310` | `#E3AE55` | partial runs |
+| `--warning-soft` | `#F5ECD8` | `#322A17` | warning tint |
+| `--danger` | `#9E2A1E` | `#F08170` | errors, destructive |
+| `--danger-soft` | `#F5E2DE` | `#38211C` | error tint |
 
-The accent is used only for: the primary action, the current step marker, keyboard focus, the wipe divider, and the active segmented pill. Savings are `--success`; errors `--danger`; partial runs `--warning`. No other colour appears.
+The accent is **ink blue**, used only for: the primary action, the current step marker, keyboard
+focus, the wipe divider, slider thumbs and the active segmented pill. Savings are `--success`;
+errors `--danger`; partial runs `--warning`. No other colour appears. Measured contrast: accent on
+surface 8.6:1 light / 7.8:1 dark, `--accent-ink` on accent 9.0:1 / 8.0:1, accent on its tint 7.6:1 /
+6.3:1 — all clear of the 4.5:1 AA floor.
 
 ## Typography
 

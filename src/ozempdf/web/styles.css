@@ -56,10 +56,10 @@
   --ink-3: #6b6c63;
   --rule: #dbd9d0;
   --rule-strong: #b8b6ab;
-  --accent: #b93b1b;
-  --accent-hover: #9f3015;
+  --accent: #1b4a80;
+  --accent-hover: #143a67;
   --accent-ink: #ffffff;
-  --accent-soft: #f7e8e1;
+  --accent-soft: #e6edf7;
   --success: #1c6742;
   --success-soft: #e3efe6;
   --warning: #7e5310;
@@ -85,10 +85,10 @@
   --ink-3: #96978d;
   --rule: #30322b;
   --rule-strong: #4a4c42;
-  --accent: #ee6543;
-  --accent-hover: #ff7955;
-  --accent-ink: #1b0d08;
-  --accent-soft: #39241b;
+  --accent: #63b3ed;
+  --accent-hover: #86c7f2;
+  --accent-ink: #0a1622;
+  --accent-soft: #16283a;
   --success: #5ec191;
   --success-soft: #1c2e24;
   --warning: #e3ae55;

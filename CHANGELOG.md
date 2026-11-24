@@ -4,6 +4,19 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.3 — 2026-11-24
+
+### Changed
+
+- **New interface accent colour: deep blue instead of vermilion.** The brand mark, primary buttons,
+  active step, focus rings, slider thumbs, the wipe divider and the breakdown bars are now ink blue
+  (`#1b4a80` light, `#63b3ed` dark). The drafting-table neutrals are unchanged, and the semantic
+  colours keep their meaning: green still means saved/completed, red still means danger or a failed
+  file, amber still means a partial run. Every pairing was re-measured for WCAG AA — accent on
+  surface 8.6:1, white on accent 9.0:1, accent on its tint 7.6:1 in the light theme; 7.8:1, 8.0:1
+  and 6.3:1 in the dark theme, all above the 4.5:1 floor.
+- The application icon follows the accent, so the taskbar, window and ZIP read as the same product.
+
 ## 0.3.2 — 2026-11-24
 
 ### Changed

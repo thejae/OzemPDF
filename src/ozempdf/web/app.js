@@ -72,6 +72,10 @@
       node.placeholder = t(node.dataset.i18nPlaceholder);
     });
     document.title = t('app.window_title', { version: state.version });
+    const versionLabel = $('#versionLabel');
+    if (versionLabel) versionLabel.textContent = `v${state.version}`;
+    const helpVersion = $('#helpVersion');
+    if (helpVersion) helpVersion.textContent = `v${state.version}`;
   }
 
   /* ------------------------------------------------------------------ */

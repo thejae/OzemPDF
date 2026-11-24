@@ -78,9 +78,18 @@ def test_index_serves_ui_and_sets_session_cookie(live) -> None:
     status, body, _headers = client.get("/api/bootstrap")
     assert status == 200
     payload = _json(body)
-    assert payload["version"] == "0.3.2"
+    assert payload["version"] == "0.3.3"
     assert "header.step1" in payload["strings"]
     assert payload["queue"] == []
+
+
+def test_static_version_label_matches_package_version() -> None:
+    """The hardcoded fallback in index.html must never drift (it once said 0.3.0)."""
+    from ozempdf import __version__
+    from ozempdf.server import WEB_DIR
+
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert f'id="versionLabel">v{__version__}<' in html
 
 
 def test_api_requires_the_session_cookie(live) -> None:
