@@ -1,9 +1,14 @@
 """Settings persistence.
 
-A single small JSON file in the platform's per-user config location. Writes are
-atomic; a missing, corrupt or unwritable file never stops the app from working.
-The payload is driven by :data:`PERSISTED_KEYS` (defect D-07) and includes the
+A single small JSON file in the app's data directory. Writes are atomic; a
+missing, corrupt or unwritable file never stops the app from working. The
+payload is driven by :data:`PERSISTED_KEYS` (defect D-07) and includes the
 language choice (defect D-21).
+
+A packaged/portable build keeps everything next to the executable: the
+``OZEMPDF_DATA_DIR`` environment variable wins, then a frozen engine derives
+``data/`` beside the app folder. A pip-installed CLI keeps the platform-standard
+per-user config location.
 """
 
 from __future__ import annotations
@@ -47,8 +52,38 @@ PERSISTED_CONFIG_KEYS = (
 )
 
 
+def _portable_data_dir() -> Path | None:
+    """Return the portable data directory, or None for a system install.
+
+    Resolution order:
+
+    1. ``OZEMPDF_DATA_DIR`` — set by the Electron shell and the Windows browser
+       launcher so every process agrees.
+    2. A frozen engine that lives inside the packaged app: walk up from the
+       executable to the folder containing ``resources/`` (or ``OzemPDF.exe``)
+       and use ``<that folder>/data``.
+    3. A frozen engine run on its own: ``<engine folder>/data``.
+    """
+    override = os.environ.get("OZEMPDF_DATA_DIR", "").strip()
+    if override:
+        return Path(override).expanduser()
+    if not getattr(sys, "frozen", False):
+        return None
+    executable = Path(sys.executable).resolve()
+    for parent in (executable.parent, *executable.parents):
+        try:
+            if (parent / "resources").is_dir() or (parent / "OzemPDF.exe").is_file():
+                return parent / "data"
+        except OSError:
+            continue
+    return executable.parent / "data"
+
+
 def settings_dir() -> Path:
-    """Platform-standard per-user config directory for OzemPDF."""
+    """Directory holding settings, staging and other app-owned files."""
+    portable = _portable_data_dir()
+    if portable is not None:
+        return portable
     if sys.platform == "win32":
         base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
         return Path(base) / "OzemPDF"

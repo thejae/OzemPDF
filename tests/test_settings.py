@@ -48,6 +48,16 @@ def test_roundtrip_keeps_only_whitelisted_keys(config_dir: Path) -> None:
     assert "sign_pkcs12_password" not in data["config"]
 
 
+def test_portable_data_dir_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A packaged/portable launch points every app file at its own data folder."""
+    portable = tmp_path / "app" / "data"
+    monkeypatch.setenv("OZEMPDF_DATA_DIR", str(portable))
+    assert settings.settings_dir() == portable
+    assert settings.save_settings({"dark_mode": False}) is True
+    assert (portable / "settings.json").is_file()
+    assert settings.load_settings()["dark_mode"] is False
+
+
 def test_corrupt_settings_fall_back_to_defaults(config_dir: Path) -> None:
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / "settings.json").write_text("{not json", encoding="utf-8")

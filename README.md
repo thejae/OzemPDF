@@ -1,6 +1,6 @@
 # OzemPDF
 
-**v0.3.1** — surgical lossless and visually-lossless PDF slimming.
+**v0.3.2** — surgical lossless and visually-lossless PDF slimming.
 
 OzemPDF makes PDFs smaller without re-distilling pages. It never rasterizes page content and
 never rewrites vector or text operators; it performs object-level surgery on embedded images,
@@ -76,25 +76,22 @@ folder browser; dragging files into a browser copies them to the app's staging f
 browser cannot expose real paths. The Electron shell passes real paths, so drop-to-compress works
 there as expected.
 
-### Windows: if the desktop window does not open
+### Windows: portable, no installer
 
-Some managed, containerised or hardened Windows hosts block Chromium's sandbox before any
-application code runs, and others block NSIS installers from writing their temporary extraction
-directory. The ZIP build exists for exactly those machines:
+The Windows build is a single **portable ZIP**: `app/release/OzemPDF-0.3.2-win.zip`. There is no
+installer, no registry entry, no Program Files copy and no uninstaller. Extract it anywhere
+writable (for example `D:\OzemPDF`) and run from there; do not run it from inside the ZIP.
 
-1. Download/extract `app/release/OzemPDF-0.3.1-win.zip` somewhere writable (never run it from inside
-   the ZIP).
-2. Try `OzemPDF.exe`. On a normal PC this is the desktop app.
-3. If no window appears, run **`Start OzemPDF (compatibility).cmd`** — the same desktop app with
-   Chromium's sandbox disabled for hosts that block it.
-4. If the desktop shell still cannot start, run **`Start OzemPDF in browser.cmd`**. It launches the
-   bundled Python engine and opens the complete interface in your default browser, with no Electron,
-   no Python installation and no installer involved. Close the console window to stop the server.
+1. `OzemPDF.exe` — the desktop app. On a normal PC extract-and-run is the whole installation.
+2. `Start OzemPDF (compatibility).cmd` — the same desktop app with Chromium's sandbox disabled, for
+   managed or containerised hosts where `OzemPDF.exe` exits before its main process starts.
+3. `Start OzemPDF in browser.cmd` — launches the bundled Python engine and opens the complete
+   interface in the default browser. No Electron, no Python installation and no installer; useful
+   where the host blocks the Electron sandbox entirely.
 
-Desktop startup failures are written to `%APPDATA%\OzemPDF\main.log` when the host allows the
-Electron process to write there; the console launchers also show the engine's own output. The
-portable `OzemPDF <version>.exe` and the NSIS installer are the right choice only on hosts that allow
-the installer to extract and run.
+Everything the app owns lives in `data\` beside the executable — settings, caches, crash dumps,
+staging, logs and temp files. Move or delete the extracted folder and no trace remains. Desktop
+startup failures are written to `data\main.log`; the console launchers also show the engine output.
 
 ### Command line
 
@@ -143,11 +140,20 @@ is not encryption of the content, and removing those restrictions is not decrypt
 
 ## Configuration and data
 
-| Platform | Location |
+A packaged or portable **Windows** build keeps every file it owns in `data\` beside the executable —
+settings, staging, Chromium caches, crash dumps, logs and temp. Moving or deleting that folder
+removes every trace; no `%APPDATA%` directory is created. Packaged macOS/Linux builds use their
+standard application-data location.
+
+A pip-installed CLI uses the platform-standard per-user location. A frozen engine run on its own
+writes `data/` beside itself, and any build with `OZEMPDF_DATA_DIR` uses that folder:
+
+| Installation | Location |
 | --- | --- |
-| Windows | `%APPDATA%\OzemPDF\settings.json` |
-| macOS | `~/Library/Application Support/OzemPDF/settings.json` |
-| Linux | `$XDG_CONFIG_HOME/OzemPDF/settings.json` |
+| Portable Windows ZIP (desktop or browser launcher) | `<app folder>\data\settings.json` |
+| Any build with `OZEMPDF_DATA_DIR` set | `$OZEMPDF_DATA_DIR\settings.json` |
+| Packaged macOS / Linux | `~/Library/Application Support/OzemPDF` / `$XDG_CONFIG_HOME/OzemPDF` |
+| Pip-installed CLI, Windows | `%APPDATA%\OzemPDF\settings.json` |
 
 The file stores the theme, language, preset, advanced knobs and output destination. Deleting it
 resets the application. Passwords never enter it.
@@ -178,7 +184,7 @@ API, locale key coverage, and that signing produces a real signature.
 
 ```bash
 python build_cross_platform.py   # frozen engine -> dist/engine/ozempdf-engine/ozempdf-engine[.exe]
-cd app && npm run dist           # ZIP + portable exe in app/release/
+cd app && npm run dist           # portable ZIP -> app/release/OzemPDF-<version>-win.zip
 ```
 
 The engine is a PyInstaller directory build carrying `locales/`, `web/` and fonts; the Electron
@@ -186,11 +192,9 @@ builder bundles the whole directory as an extra resource. A packaged build prefe
 source checkout runs the live Python package so edits take effect. Set `OZEMPDF_USE_BUNDLED=1` to
 exercise the frozen sidecar locally.
 
-The ZIP exists for hosts where the portable self-extractor or the NSIS installer cannot write its
-temporary directory. Inside the ZIP, `Start OzemPDF (compatibility).cmd` launches the same app with
-Chromium's sandbox disabled for managed/containerised Windows hosts where the normal
-`OzemPDF.exe` exits before its main process; use `OzemPDF.exe` on a normal PC. Startup failures are
-logged to `%APPDATA%\OzemPDF\main.log`.
+The ZIP is the only Windows artifact. It contains the desktop app, the two launchers and the frozen
+engine; the app writes into `data/` inside the extracted folder. There is no NSIS installer and no
+self-extracting portable exe, so nothing is written to the system temp directory or the registry.
 
 ## Repository layout
 

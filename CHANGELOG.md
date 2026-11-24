@@ -4,6 +4,23 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.2 — 2026-11-24
+
+### Changed
+
+- **Windows is now genuinely portable: one ZIP, no installer.** The NSIS installer and the
+  NSIS-based portable self-extractor are gone (`npm run dist` builds only
+  `OzemPDF-<version>-win.zip`). Nothing is extracted to the system temp directory and no uninstall
+  entry, registry key or Program Files copy exists.
+- **All app-owned files live in `data/` beside the executable**: settings, staging, Chromium caches,
+  crash dumps, logs and the process temp directory. A packaged app sets Electron's `userData`,
+  `sessionData` and `crashDumps` there and passes `OZEMPDF_DATA_DIR` to the engine; the frozen
+  engine also derives `data/` from its own location. Moving or deleting the folder removes every
+  trace. A pip-installed CLI keeps the platform-standard config location unless `OZEMPDF_DATA_DIR`
+  is set.
+- The browser launcher sets `OZEMPDF_DATA_DIR`, `TEMP` and `TMP` into `data/` as well, so the
+  no-Electron fallback is equally self-contained.
+
 ## 0.3.1 — 2026-11-24
 
 ### Fixed

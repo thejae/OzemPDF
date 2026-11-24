@@ -12,6 +12,7 @@ dist/
 # Node / Electron
 app/node_modules/
 app/release/
+app/.dev-data/
 npm-debug.log*
 
 # Generated visual artefacts

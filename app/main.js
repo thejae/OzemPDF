@@ -18,23 +18,41 @@ const READY_PREFIX = 'OZEMPDF_READY ';
 const START_TIMEOUT_MS = 30000;
 
 /**
- * Startup diagnostics. A packaged GUI has no console, so engine and window
- * failures are appended next to the settings file. This is the first thing to
- * read when the desktop shell refuses to appear.
+ * Portable data root.
+ *
+ * On Windows a packaged app is a portable folder: every file it owns lives in
+ * `data/` beside `OzemPDF.exe` (settings, caches, logs, temp, staging), so the
+ * folder can be moved or deleted as a unit and nothing is left in the user
+ * profile. macOS/Linux app bundles are not reliably writable, so packaged
+ * builds there keep Electron's normal userData location. A source checkout
+ * uses `app/.dev-data/`, which is git-ignored.
  */
-function resolveLogPath() {
-  const base =
-    process.env.APPDATA || process.env.LOCALAPPDATA || process.env.TEMP || process.cwd();
-  const directory = path.join(base, 'OzemPDF');
-  try {
-    fs.mkdirSync(directory, { recursive: true });
-  } catch (error) {
-    /* the fallback below may still be writable */
+const PORTABLE = app.isPackaged && process.platform === 'win32';
+const DATA_DIR = PORTABLE
+  ? path.join(path.dirname(process.execPath), 'data')
+  : app.isPackaged
+    ? app.getPath('userData')
+    : path.join(__dirname, '.dev-data', 'data');
+const TEMP_DIR = path.join(DATA_DIR, 'temp');
+try {
+  fs.mkdirSync(TEMP_DIR, { recursive: true });
+} catch (error) {
+  /* a read-only folder is reported by the missing log and engine errors */
+}
+if (PORTABLE || !app.isPackaged) {
+  for (const variable of ['TEMP', 'TMP', 'TMPDIR']) {
+    process.env[variable] = TEMP_DIR;
   }
-  return path.join(directory, 'main.log');
+  try {
+    app.setPath('userData', DATA_DIR);
+    app.setPath('sessionData', DATA_DIR);
+    app.setPath('crashDumps', path.join(DATA_DIR, 'crashes'));
+  } catch (error) {
+    /* Electron keeps its default paths; the log below records the failure */
+  }
 }
 
-const LOG_PATH = resolveLogPath();
+const LOG_PATH = path.join(DATA_DIR, 'main.log');
 
 function log(message) {
   try {
@@ -44,7 +62,7 @@ function log(message) {
   }
 }
 
-log(`--- start argv=${JSON.stringify(process.argv.slice(1))} packaged=${app.isPackaged} resources=${process.resourcesPath}`);
+log(`--- start argv=${JSON.stringify(process.argv.slice(1))} packaged=${app.isPackaged} data=${DATA_DIR} resources=${process.resourcesPath}`);
 process.on('uncaughtException', (error) => log(`uncaughtException ${error.stack || error}`));
 process.on('unhandledRejection', (reason) => log(`unhandledRejection ${reason}`));
 
@@ -87,14 +105,19 @@ function engineCommand() {
 
 function startEngine() {
   const spec = engineCommand();
-  const env = { ...process.env };
+  const env = {
+    ...process.env,
+    OZEMPDF_DATA_DIR: DATA_DIR,
+    TEMP: TEMP_DIR,
+    TMP: TEMP_DIR,
+    PYTHONUNBUFFERED: '1',
+    PYTHONIOENCODING: 'utf-8',
+  };
   if (spec.python) {
     const srcDir = app.isPackaged
       ? path.join(process.resourcesPath, 'engine', 'src')
       : path.join(repoRoot(), 'src');
     env.PYTHONPATH = srcDir + (env.PYTHONPATH ? path.delimiter + env.PYTHONPATH : '');
-    env.PYTHONUNBUFFERED = '1';
-    env.PYTHONIOENCODING = 'utf-8';
   }
   log(`engine command=${spec.command} args=${JSON.stringify(spec.args)} cwd=${spec.cwd}`);
 

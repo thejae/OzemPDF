@@ -1,7 +1,7 @@
 {
   "name": "ozempdf",
   "productName": "OzemPDF",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "OzemPDF desktop shell — surgical lossless PDF slimming",
   "main": "main.js",
@@ -9,8 +9,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win zip portable",
-    "dist:installer": "electron-builder --win nsis"
+    "dist": "electron-builder --win zip"
   },
   "devDependencies": {
     "electron": "^45.4.1",
@@ -46,12 +45,8 @@
       }
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": ["zip"],
       "icon": "build/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
     },
     "mac": {
       "target": ["dmg"],

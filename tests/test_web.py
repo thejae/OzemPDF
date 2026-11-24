@@ -78,7 +78,7 @@ def test_index_serves_ui_and_sets_session_cookie(live) -> None:
     status, body, _headers = client.get("/api/bootstrap")
     assert status == 200
     payload = _json(body)
-    assert payload["version"] == "0.3.1"
+    assert payload["version"] == "0.3.2"
     assert "header.step1" in payload["strings"]
     assert payload["queue"] == []
 
