@@ -16,6 +16,8 @@ All notable changes to OzemPDF are documented here. The format follows
   surface 8.6:1, white on accent 9.0:1, accent on its tint 7.6:1 in the light theme; 7.8:1, 8.0:1
   and 6.3:1 in the dark theme, all above the 4.5:1 floor.
 - The application icon follows the accent, so the taskbar, window and ZIP read as the same product.
+- `AGENTS.md` now records where the GitHub GPG passphrase lives, so agents can read it when signing
+  commits instead of asking the user each time.
 
 ## 0.3.2 — 2026-11-24
 
