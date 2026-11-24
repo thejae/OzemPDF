@@ -36,7 +36,7 @@ Constraints: Python ≥3.10 engine; no external PDF binaries; outputs are plain 
 
 ## Brand Commitments
 
-Name OzemPDF, version line v0.3.0. The product's voice is precise and quiet: it states measured facts ("38.4 MB saved", "vectors preserved"), never marketing adjectives. No emoji as UI iconography.
+Name OzemPDF, version line v0.3.1. The product's voice is precise and quiet: it states measured facts ("38.4 MB saved", "vectors preserved"), never marketing adjectives. No emoji as UI iconography.
 
 ## Evidence on Hand
 

@@ -1,0 +1,3 @@
+# Windows launchers must keep CRLF line endings to behave in cmd.exe.
+*.cmd text eol=crlf
+*.bat text eol=crlf

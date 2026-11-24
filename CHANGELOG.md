@@ -4,6 +4,22 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.1 — 2026-11-24
+
+### Fixed
+
+- **Packaged Windows build starts on hosts that block Chromium's sandbox.** On a managed or
+  containerised host the sandbox fails before the Electron main process runs, so the app exited
+  with no window and no log. The build now ships `Start OzemPDF (compatibility).cmd`, which starts
+  the same application with `--no-sandbox`; `OzemPDF.exe` remains the normal entry point elsewhere.
+- **Windows distribution includes a ZIP** (`npm run dist` builds ZIP + portable). Hosts where NSIS
+  cannot write its temporary extraction directory can unzip and run the app; `npm run dist:installer`
+  still builds the NSIS installer on hosts that can execute its uninstaller pass. The ZIP also
+  contains `Start OzemPDF in browser.cmd`, which runs the bundled engine and opens the HTML
+  interface in the default browser — no Electron, Python or installer required.
+- **Desktop startup is diagnosable.** Electron, engine and window failures are appended to
+  `%APPDATA%\OzemPDF\main.log` instead of disappearing with the GUI console.
+
 ## 0.3.0 — 2026-11-24
 
 The PySide6 desktop application is replaced by an HTML/CSS/JS interface served by the Python

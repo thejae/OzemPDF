@@ -17,6 +17,37 @@ const fs = require('node:fs');
 const READY_PREFIX = 'OZEMPDF_READY ';
 const START_TIMEOUT_MS = 30000;
 
+/**
+ * Startup diagnostics. A packaged GUI has no console, so engine and window
+ * failures are appended next to the settings file. This is the first thing to
+ * read when the desktop shell refuses to appear.
+ */
+function resolveLogPath() {
+  const base =
+    process.env.APPDATA || process.env.LOCALAPPDATA || process.env.TEMP || process.cwd();
+  const directory = path.join(base, 'OzemPDF');
+  try {
+    fs.mkdirSync(directory, { recursive: true });
+  } catch (error) {
+    /* the fallback below may still be writable */
+  }
+  return path.join(directory, 'main.log');
+}
+
+const LOG_PATH = resolveLogPath();
+
+function log(message) {
+  try {
+    fs.appendFileSync(LOG_PATH, `${new Date().toISOString()} ${message}\n`);
+  } catch (error) {
+    /* logging must never prevent startup */
+  }
+}
+
+log(`--- start argv=${JSON.stringify(process.argv.slice(1))} packaged=${app.isPackaged} resources=${process.resourcesPath}`);
+process.on('uncaughtException', (error) => log(`uncaughtException ${error.stack || error}`));
+process.on('unhandledRejection', (reason) => log(`unhandledRejection ${reason}`));
+
 let mainWindow = null;
 let engineProcess = null;
 let serverUrl = null;
@@ -65,16 +96,26 @@ function startEngine() {
     env.PYTHONUNBUFFERED = '1';
     env.PYTHONIOENCODING = 'utf-8';
   }
+  log(`engine command=${spec.command} args=${JSON.stringify(spec.args)} cwd=${spec.cwd}`);
 
   return new Promise((resolve, reject) => {
     let settled = false;
-    const child = spawn(spec.command, spec.args, { cwd: spec.cwd, env, windowsHide: true });
+    let child;
+    try {
+      child = spawn(spec.command, spec.args, { cwd: spec.cwd, env, windowsHide: true });
+    } catch (error) {
+      log(`engine spawn threw ${error.stack || error}`);
+      reject(error);
+      return;
+    }
     engineProcess = child;
+    log(`engine spawned pid=${child.pid}`);
     let buffer = '';
 
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
+        log('engine startup timeout');
         reject(new Error('The OzemPDF engine did not start in time.'));
       }
     }, START_TIMEOUT_MS);
@@ -92,21 +133,26 @@ function startEngine() {
             if (!settled) {
               settled = true;
               clearTimeout(timer);
+              log(`engine ready url=${info.url}`);
               resolve(info.url);
             }
           } catch (error) {
-            /* keep waiting */
+            log(`engine ready line unreadable: ${line}`);
           }
+        } else if (line) {
+          log(`engine stdout: ${line.slice(0, 400)}`);
         }
       }
     });
 
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk) => {
+      log(`engine stderr: ${String(chunk).trim().slice(0, 800)}`);
       process.stderr.write(chunk);
     });
 
     child.on('error', (error) => {
+      log(`engine error event ${error.stack || error}`);
       if (!settled) {
         settled = true;
         clearTimeout(timer);
@@ -114,8 +160,9 @@ function startEngine() {
       }
     });
 
-    child.on('exit', (code) => {
+    child.on('exit', (code, signal) => {
       engineProcess = null;
+      log(`engine exited code=${code} signal=${signal}`);
       if (!settled) {
         settled = true;
         clearTimeout(timer);
@@ -133,6 +180,7 @@ function startEngine() {
 }
 
 function createWindow() {
+  log('createWindow');
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -152,6 +200,15 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.webContents.on('did-finish-load', () => log('window loaded'));
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => {
+    log(`window load failed code=${code} description=${description} url=${url}`);
+  });
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    log(`renderer gone reason=${details.reason} exitCode=${details.exitCode}`);
+  });
+  mainWindow.on('unresponsive', () => log('window unresponsive'));
+  mainWindow.on('closed', () => log('window closed'));
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!serverUrl || !url.startsWith(serverUrl)) event.preventDefault();
@@ -240,6 +297,7 @@ function stopEngine() {
 }
 
 app.whenReady().then(async () => {
+  log('app ready');
   if (process.platform === 'darwin') {
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }])
@@ -251,6 +309,7 @@ app.whenReady().then(async () => {
   try {
     serverUrl = await startEngine();
   } catch (error) {
+    log(`startup failed: ${error.stack || error}`);
     dialog.showErrorBox(
       'OzemPDF could not start',
       `${error.message}\n\n` +
@@ -269,12 +328,18 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  log('window-all-closed');
   quitting = true;
   stopEngine();
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
+  log('before-quit');
   quitting = true;
   stopEngine();
+});
+
+app.on('child-process-gone', (_event, details) => {
+  log(`child process gone type=${details.type} reason=${details.reason} exitCode=${details.exitCode}`);
 });

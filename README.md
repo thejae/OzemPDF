@@ -1,6 +1,6 @@
 # OzemPDF
 
-**v0.3.0** — surgical lossless and visually-lossless PDF slimming.
+**v0.3.1** — surgical lossless and visually-lossless PDF slimming.
 
 OzemPDF makes PDFs smaller without re-distilling pages. It never rasterizes page content and
 never rewrites vector or text operators; it performs object-level surgery on embedded images,
@@ -75,6 +75,26 @@ This prints a `http://127.0.0.1:<port>/` URL and opens it. Files are then added 
 folder browser; dragging files into a browser copies them to the app's staging folder because a
 browser cannot expose real paths. The Electron shell passes real paths, so drop-to-compress works
 there as expected.
+
+### Windows: if the desktop window does not open
+
+Some managed, containerised or hardened Windows hosts block Chromium's sandbox before any
+application code runs, and others block NSIS installers from writing their temporary extraction
+directory. The ZIP build exists for exactly those machines:
+
+1. Download/extract `app/release/OzemPDF-0.3.1-win.zip` somewhere writable (never run it from inside
+   the ZIP).
+2. Try `OzemPDF.exe`. On a normal PC this is the desktop app.
+3. If no window appears, run **`Start OzemPDF (compatibility).cmd`** — the same desktop app with
+   Chromium's sandbox disabled for hosts that block it.
+4. If the desktop shell still cannot start, run **`Start OzemPDF in browser.cmd`**. It launches the
+   bundled Python engine and opens the complete interface in your default browser, with no Electron,
+   no Python installation and no installer involved. Close the console window to stop the server.
+
+Desktop startup failures are written to `%APPDATA%\OzemPDF\main.log` when the host allows the
+Electron process to write there; the console launchers also show the engine's own output. The
+portable `OzemPDF <version>.exe` and the NSIS installer are the right choice only on hosts that allow
+the installer to extract and run.
 
 ### Command line
 
@@ -158,13 +178,19 @@ API, locale key coverage, and that signing produces a real signature.
 
 ```bash
 python build_cross_platform.py   # frozen engine -> dist/engine/ozempdf-engine/ozempdf-engine[.exe]
-cd app && npm run dist           # Electron installer for the current platform
+cd app && npm run dist           # ZIP + portable exe in app/release/
 ```
 
 The engine is a PyInstaller directory build carrying `locales/`, `web/` and fonts; the Electron
 builder bundles the whole directory as an extra resource. A packaged build prefers the sidecar; a
 source checkout runs the live Python package so edits take effect. Set `OZEMPDF_USE_BUNDLED=1` to
 exercise the frozen sidecar locally.
+
+The ZIP exists for hosts where the portable self-extractor or the NSIS installer cannot write its
+temporary directory. Inside the ZIP, `Start OzemPDF (compatibility).cmd` launches the same app with
+Chromium's sandbox disabled for managed/containerised Windows hosts where the normal
+`OzemPDF.exe` exits before its main process; use `OzemPDF.exe` on a normal PC. Startup failures are
+logged to `%APPDATA%\OzemPDF\main.log`.
 
 ## Repository layout
 
