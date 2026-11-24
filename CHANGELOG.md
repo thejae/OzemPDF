@@ -18,6 +18,21 @@ All notable changes to OzemPDF are documented here. The format follows
 - The application icon follows the accent, so the taskbar, window and ZIP read as the same product.
 - `AGENTS.md` now records where the GitHub GPG passphrase lives, so agents can read it when signing
   commits instead of asking the user each time.
+- **Documentation synchronised with the shipped application.** The technical specification is
+  rewritten as version 2.0 for the HTML/CSS/Electron architecture (new interface chapter, real
+  preset/range/config tables, a defects-and-limitations chapter, current test inventory); the user
+  stories now cover the four behaviours that shipped without a written story (US-055 … US-058) and
+  record the 0.3.x release slices; the discrepancy ledger lists the defects found after the rewrite.
+
+### Fixed
+
+- **The header showed a stale version.** The version chip was hardcoded as `v0.3.0` in the markup and
+  never updated, so a 0.3.3 build still claimed 0.3.0. It now renders the running version, and a test
+  fails if the static fallback drifts from `_version.py`.
+- **`CompressionConfig.from_preset()` ignored preset enum members.** Because `PresetMode` is a string
+  enum, `str(PresetMode.LOSSLESS)` is `"PresetMode.LOSSLESS"` on Python 3.11+, so passing a member
+  raised `ValueError` and fell back silently to balanced. Enum members are now used directly, with a
+  test covering every member.
 
 ## 0.3.2 — 2026-11-24
 

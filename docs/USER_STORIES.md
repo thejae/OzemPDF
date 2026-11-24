@@ -1,7 +1,9 @@
 # OzemPDF — User Stories
 
-**Product:** OzemPDF v0.1.0 — cross-platform surgical lossless & visually-lossless PDF slimmer (PySide6 desktop GUI + `ozempdf` CLI)
-**Document status:** v1 · derived from the shipped implementation
+**Product:** OzemPDF v0.3.3 — cross-platform surgical lossless & visually-lossless PDF slimmer
+(HTML/CSS/JS interface served by the Python engine, wrapped by an Electron desktop shell, plus the
+`ozempdf` CLI)
+**Document status:** v2 · derived from the shipped implementation
 **Last updated:** 2026-11-24
 
 ---
@@ -15,15 +17,17 @@ These stories describe what OzemPDF does **today** (traced through `src/ozempdf/
 | **Epic** | Feature area (E1–E11) |
 | **Persona** | The primary user the story is for |
 | **Priority** | MoSCoW: **Must** = the product is broken without it; **Should** = expected; **Could** = nice to have |
-| **Status** | **Shipped** = exists in v0.1.0 · **Partial** = exists but incomplete · **Proposed** = not built yet |
+| **Status** | **Shipped** = exists in the current release (0.3.3); a version in parentheses marks where it landed · **Partial** = exists but incomplete · **Proposed** = not built yet |
 
-Stories are numbered `US-001 … US-054`. IDs are stable — reference them in commits, issues, and the changelog.
+Stories are numbered `US-001 … US-058`. IDs are stable — reference them in commits, issues, and the changelog.
 
-> **Architecture note (v0.3.0).** The product stories below are the durable contract and remain
-> authoritative. The implementation notes that name PySide6 modules (`gui/main_window.py`,
-> `gui/worker.py`, …) describe the superseded Qt build; the current interface is HTML/CSS/JS over
-> the same Python engine. Every story is now Shipped in v0.3.0, including the five that were
-> Proposed/Partial in v0.1.0 (US-004, US-036, US-051, US-052, US-053).
+> **Architecture note (v0.3.3).** These stories are the durable contract and remain authoritative;
+> the notes under each story were rewritten to name what implements it today. The interface is plain
+> HTML, CSS and JavaScript in `src/ozempdf/web/`, served over a loopback HTTP API by
+> `src/ozempdf/server.py` and wrapped by the Electron shell in `app/`. The engine, the CLI and the
+> invariants are unchanged. Every story is Shipped, including the five that were Proposed/Partial in
+> v0.1.0 (US-004, US-036, US-051, US-052, US-053) and four added at v0.3.x for behaviour that had
+> shipped without a written story (US-055 … US-058).
 
 ---
 
@@ -52,8 +56,8 @@ Stories are numbered `US-001 … US-054`. IDs are stable — reference them in c
 | **E7 · Verifying quality** | US-028 – US-032 | Wipe-slider inspector, zoom, pages, external viewer |
 | **E8 · Making it mine** | US-033 – US-037 | Dark/light, live language switch, new locale files, remembered settings |
 | **E9 · Command line & automation** | US-038 – US-041 | One command, folders, flags, JSON report, exit codes |
-| **E10 · The engine's promises** | US-042 – US-048 | Vectors intact, never-grow, lossless, dedup, fonts, signatures |
-| **E11 · Trust, reliability & access** | US-049 – US-054 | Offline, cross-platform, crash-safe writes, plus three gaps |
+| **E10 · The engine's promises** | US-042 – US-048, US-055, US-056 | Vectors intact, never-grow, lossless, dedup, fonts, locks, re-signing |
+| **E11 · Trust, reliability & access** | US-049 – US-054, US-057, US-058 | Offline, cross-platform, crash-safe writes, portable folder, browser fallback |
 
 ---
 
@@ -85,7 +89,7 @@ Stories are numbered `US-001 … US-054`. IDs are stable — reference them in c
 - **Given** I am on Step 2, **when** I use the queue header's *Add More PDFs* / *Add Folder*, **then** new files are appended to the existing queue rather than replacing it.
 - **Given** I press `Ctrl+O` or `Ctrl+Shift+F` anywhere in the window, **then** the corresponding picker opens (except while a batch is running, where no picker opens from the shortcut).
 
-**Notes** — Shortcuts registered in `_register_shortcuts()`; the same actions are reachable from the queue header toolbar.
+**Notes** — One global `keydown` handler in `app.js` (Ctrl/Cmd+O, Ctrl/Cmd+Shift+O); the same actions are reachable from the queue header toolbar.
 
 ### US-003 · Adding the same file twice never duplicates it
 **Epic:** E1 · **Persona:** Priya · **Priority:** Must · **Status:** Shipped
@@ -306,7 +310,7 @@ Stories are numbered `US-001 … US-054`. IDs are stable — reference them in c
 - **Given** multiple queued files, **then** they are processed in parallel on multiple CPU cores and rows may finish out of order.
 - **Given** a single file, **then** it is processed without the overhead of worker processes.
 
-**Notes** — Batch work runs in a `QThread` driving a process pool; the engine reports per-file completion only, which is why per-row progress is indeterminate.
+**Notes** — Batch work runs in the server's run thread, which dispatches files to a `ProcessPoolExecutor`; the engine reports per-file completion only, which is why per-row progress is indeterminate.
 
 ### US-019 · Stop a long run without losing finished work
 **Epic:** E5 · **Persona:** Priya · **Priority:** Must · **Status:** Shipped
@@ -785,52 +789,169 @@ Stories are numbered `US-001 … US-054`. IDs are stable — reference them in c
 
 ---
 
+### US-055 · Remove a PDF's restrictions without a password
+**Epic:** E10 · **Persona:** Priya · **Priority:** Must · **Status:** Shipped (v0.3.0)
+
+**Story**
+> As Priya, when a supplier sends a PDF that forbids printing or copying, I want OzemPDF to hand me a
+> normal PDF without asking me for a password I do not have, so that I can archive it with the rest.
+
+**Acceptance criteria**
+- **Given** a document that opens with the empty user password (owner restrictions only), **when** it
+  is compressed, **then** no password is requested and the output carries no restrictions.
+- **Given** a document that needs an open password, **when** I run without one, **then** it is
+  reported as *password required* and nothing is guessed, tried or brute-forced.
+- **Given** certificate or public-key encryption, **then** it is reported as unsupported with a
+  readable reason instead of being silently skipped.
+- **Given** documents were unlocked in a batch, **then** the results band counts them and the JSON
+  records `protection_kind` and `protection_removed` per file.
+
+**Notes** — `engine/unlock.py` classifies protection (`none`, `permissions`, `password`,
+`unsupported`) and tries the empty user password first, then only the password the user supplied.
+Removing permission restrictions is not decryption: every reader already opens the file with that
+empty password.
+
+### US-056 · Re-sign a document after slimming
+**Epic:** E10 · **Persona:** Priya · **Priority:** Should · **Status:** Shipped (v0.3.0)
+
+**Story**
+> As Priya, when a signed contract has to be smaller, I want to replace the old signature with a new
+> one I control, so that the archived copy is both slim and verifiably signed.
+
+**Acceptance criteria**
+- **Given** I enable flattening and provide a PKCS#12 file with its passphrase, **when** the run
+  finishes, **then** the output carries a new signature over the compressed bytes.
+- **Given** I supply the wrong passphrase, **then** the file fails with an error naming the
+  certificate problem and no unsigned output is written.
+- **Given** I supply a timestamp authority URL, **then** the new signature carries an RFC 3161
+  timestamp.
+- **Given** the run ends, **then** the passphrase is neither stored in settings nor printed in the
+  report or the console.
+
+**Notes** — `engine/signing.py` (pyhanko): `SimpleSigner.load_pkcs12`, SHA-256, optional
+`HTTPTimeStamper`, verification that the field exists in `/AcroForm /Fields`, then an atomic promote.
+Signing is off by default and never part of a preset.
+
+### US-057 · Run from any folder and leave nothing behind
+**Epic:** E11 · **Persona:** Sam · **Priority:** Should · **Status:** Shipped (v0.3.2)
+
+**Story**
+> As Sam, I want to unzip OzemPDF onto a USB stick or a locked-down machine and run it from there, so
+> that I can work without an installer, admin rights, or traces left on the machine.
+
+**Acceptance criteria**
+- **Given** I extract the ZIP into any writable folder, **when** I double-click `OzemPDF.exe`,
+  **then** the window opens with no flags, no console and no installer.
+- **Given** the app has run, **then** everything it wrote sits in `data/` beside the executable —
+  settings, caches, logs, temp files — and `%APPDATA%`, `~/.config` and the system temp directory
+  hold nothing new from it.
+- **Given** I delete the folder, **then** no part of OzemPDF remains on the machine.
+- **Given** `OZEMPDF_DATA_DIR` is set, **then** that location wins, so a script can pin state
+  anywhere.
+
+**Notes** — `settings._portable_data_dir` (override → frozen-engine walk-up → platform location) and
+`app/main.js` (redirects Electron's `userData`, `sessionData`, `crashDumps` and the process temp
+directory). Verified by extracting the ZIP outside the development workspace and launching it.
+
+### US-058 · Use the browser when the desktop window cannot start
+**Epic:** E11 · **Persona:** Nadia · **Priority:** Could · **Status:** Shipped (v0.3.1)
+
+**Story**
+> As Nadia, on a machine whose security policy blocks the desktop window, I want another way in that
+> still gives me the whole interface.
+
+**Acceptance criteria**
+- **Given** the native window cannot start, **when** I run the browser launcher, **then** the full
+  interface opens in my default browser with presets, queue, results and the inspector.
+- **Given** I drop files there, **then** they are staged internally and compressed, and a notice
+  explains that a copy is used because a browser cannot reveal real paths.
+- **Given** the browser is serving the interface, **then** it is bound to `127.0.0.1`, every API call
+  needs the session token, and nothing is reachable from my network.
+
+**Notes** — `--serve --port N [--no-browser]`, `/api/upload` staging, loopback token and origin
+check in `server.py`. Same UI files as the desktop app: there is no second implementation.
+
+---
+
 # 4. Release slices
 
 | Slice | Scope | State |
 | --- | --- | --- |
-| **v0.3.0 (current)** | US-001 – US-054, including the previously Proposed/Partial items; HTML/CSS/JS interface over the Python engine with Electron on Windows, macOS and Linux | Shipped |
+| **0.3.0** | HTML/CSS/JS interface over the Python engine, Electron shell, every `D-01 … D-21` closed, protection removal, re-signing; US-001 – US-056 | Shipped |
+| **0.3.1** | Compatibility launcher for hosts that block the Chromium sandbox, ZIP distribution, startup diagnostics in `main.log`; US-058 | Shipped |
+| **0.3.2** | Electron 38 (direct launch), read-only inputs (cloud/locked files), portable `data/` with no `%APPDATA%` writes; US-057 | Shipped |
+| **0.3.3 (current)** | Ink-blue accent and matching icon, version chip rendered from the running version, documentation synchronised with the shipped behaviour | Shipped |
 
 ---
 
 # 5. Traceability
 
-| Epic | Primary modules |
-| --- | --- |
-| E1 Intake | `gui/main_window.py` (`add_paths_to_queue`, `dropEvent`), `engine/batch.py` (`discover_pdf_files`) |
-| E2 Queue | `gui/main_window.py` (`FileQueueRowWidget`), `gui/worker.py` (`ThumbnailLoaderThread`) |
-| E3 Presets | `gui/main_window.py` (`_build_preset_and_advanced_card`), `config.py` (`from_preset`) |
-| E4 Output | `engine/batch.py` (`resolve_output_path`), `gui/main_window.py` (`OutputPopoverPopup`) |
-| E5 Run | `gui/worker.py` (`BatchCompressionWorker`), `engine/batch.py` (`run_batch_compression`) |
-| E6 Savings | `engine/analyzer.py` (`audit_pdf_bytes`), `gui/breakdown_widget.py` |
-| E7 Inspector | `gui/preview_dialog.py` |
-| E8 Appearance | `gui/theme.py`, `i18n.py`, `gui/settings.py`, `locales/en.json` |
-| E9 CLI | `cli.py`, `engine/batch.py` (`BatchSummary.to_dict`) |
-| E10 Engine | `engine/unlock.py`, `analyzer.py`, `deduplicator.py`, `image_optimizer.py`, `font_optimizer.py`, `stream_optimizer.py`, `pipeline.py` |
-| E11 Trust | `engine/pipeline.py` (atomic write + guardrail), `gui/main_window.py` (`closeEvent`) |
+| Epic | Interface | Engine / server |
+| --- | --- | --- |
+| E1 Intake | `web/index.html` drop mat, `app.js` (`bindDragAndDrop`, `openFiles`, `openFolder`) | `engine/batch.py` (`discover_pdf_files`), `/api/queue/add` |
+| E2 Queue | `app.js` (`renderQueue`, row builder) | `/api/thumb`, `engine/batch.py` (`render_page_png`) |
+| E3 Presets | `app.js` (`renderMode`, knob handlers) | `config.py` (`from_preset`, `clamped`), `/api/preset`, `/api/config` |
+| E4 Output | `app.js` (destination dialog, suffix field) | `engine/batch.py` (`resolve_output_path`, `_unique_outputs`) |
+| E5 Run | `app.js` (`startRun`, poll loop, dock) | `server.py` run thread, `engine/batch.py` (`run_batch_compression`) |
+| E6 Savings | `app.js` (`renderBreakdown`, aggregate/single toggle) | `engine/analyzer.py` (`audit_pdf_bytes`) |
+| E7 Inspector | `app.js` (inspector, wipe, zoom, page keys) | `/api/page`, `engine/batch.py` (`render_page_png`) |
+| E8 Appearance | `web/styles.css` tokens, `app.js` (`applyI18n`) | `i18n.py`, `settings.py`, `locales/en.json`, `/api/ui` |
+| E9 CLI | `cli.py` | `engine/batch.py` (`BatchSummary.to_dict`) |
+| E10 Engine | drawer flags and consent dialogs | `engine/unlock.py`, `analyzer.py`, `deduplicator.py`, `image_optimizer.py`, `font_optimizer.py`, `stream_optimizer.py`, `signing.py`, `pipeline.py` |
+| E11 Trust | `app.js` close guard, portable notice | `engine/pipeline.py` (atomic write + guardrail), `settings.py` (portable dir), `app/main.js` |
 
-Existing automated coverage maps to these stories: `tests/test_lossless.py` (US-043, US-044), `tests/test_visually_lossless.py` (US-045), `tests/test_security_and_fonts.py` (US-046, US-047), `tests/test_batch.py` (US-039, US-041), `tests/test_gui.py` (US-001, US-021, US-026, US-029).
+Automated coverage maps to these stories: `tests/test_lossless.py` (US-042, US-043, US-044),
+`tests/test_visually_lossless.py` (US-030, US-045), `tests/test_security_and_fonts.py` (US-046,
+US-047, US-051, US-055, US-056), `tests/test_batch.py` (US-003, US-014, US-019, US-020, US-038,
+US-039, US-041), `tests/test_settings.py` (US-036, US-057), `tests/test_i18n.py` (US-035, US-037),
+`tests/test_web.py` (US-001, US-004, US-021, US-026, US-034, US-053, US-058).
 
 ---
 
 # 6. Open questions
 
-1. **Default preset on a cold start** — Balanced is a good default for size, but is it the right first impression for a vector-heavy audience who will judge the product on sharpness?
-2. **Signature flattening default** — it is on in every preset. For a compliance buyer, silently invalidating a signature may be unacceptable; should it require an explicit opt-in with a warning?
-3. **Overwrite safety** — confirmation exists, but should overwritten originals be recoverable (backup/trash) instead of atomically replaced?
-4. **"100% vectors preserved" claim** — the UI asserts it, but nothing verifies it per run. Should the app compare page content streams before/after and report a mismatch?
-5. **Guardrail visibility** — see US-052; is "already optimal" a first-class outcome or an edge case?
-6. **GUI password scope** — per-run prompt (US-051) or per-file? What happens to the password when a batch is retried?
-7. **Per-file progress** — the engine reports per file only. Is an indeterminate bar acceptable for multi-minute Zopfli runs, or does the engine need progress reporting?
+## 6.1 Settled in 0.3.x
+
+| Question | Decision |
+| --- | --- |
+| Default preset on a cold start | **Visually Lossless** stays the default; the results breakdown and the wipe-slider inspector make the quality measurable, which is the counterweight a vector-heavy user needs. |
+| Signature flattening default | **Off** everywhere, behind a consent dialog (D-14). Re-signing exists for users who must end up signed. |
+| Overwrite safety | Atomic replace after confirmation, defaulting to No. No automatic backup/trash: documented rather than silently added. |
+| "100 % vectors preserved" claim | Backed by a construction invariant plus tests that compare decoded content bytes and pixels; there is no per-run diff in the product. |
+| Guardrail visibility | First-class: row status, results-band note, inspector note, JSON `already_optimal` and a CLI line. |
+| Password scope | One prompt per run, applied to the remaining rows; the password lives only in the running process and is never persisted. |
+| Browser vs desktop parity | One implementation: the browser serves the same three files and the same API, with upload staging as the only documented difference. |
+| Portable storage | `data/` beside the executable; the platform config location is used only for a source install. |
+
+## 6.2 Still open
+
+1. **Per-file progress** — the engine reports per file only; a multi-minute Zopfli pass still shows an
+   indeterminate bar. Stage-level progress needs engine callbacks.
+2. **Backup of overwritten originals** — should overwrite keep a recoverable copy? It is deliberately
+   not implemented, because a second full copy doubles the disk cost the product exists to reduce.
+3. **PDF/A and PDF/X** — the app preserves what it does not touch but cannot promise conformance; a
+   preservation mode would have to refuse some optimisations.
+4. **Pixel-difference readout** — the inspector shows both renders side by side; a numeric MSE/PSNR
+   would make "visually lossless" measurable in-product.
+5. **Signed builds** — the ZIP is unsigned, so SmartScreen warns on first run. Code signing needs a
+   certificate and a recurring cost decision.
+6. **macOS and Linux verification** — configured and tested in CI, but no end-to-end packaged run has
+   been performed by the maintainer.
 
 ---
 
 # 7. Definition of Ready / Done (repo conventions)
 
-**Ready** — story has personas, measurable acceptance criteria, a priority, and an owner-visible scope.
+**Ready** — the story has personas, measurable acceptance criteria, a priority, and an
+owner-visible scope.
 
 **Done** — additionally, per this repo's `AGENTS.md`:
-- No user-facing string is hardcoded; every new key exists in `src/ozempdf/locales/en.json`.
-- Both Dark and Light themes are verified for any touched widget or dialog.
-- The three-step progressive-disclosure flow and the vector/never-grow invariants still hold.
-- `_version.py` and `CHANGELOG.md` are updated, with atomic conventional commits.
+- No user-facing string is hardcoded; every new key exists in `src/ozempdf/locales/en.json` and no
+  orphan key remains (tested).
+- Both themes are verified at desktop and mobile widths for any touched surface, and the layout
+  survives the 1080/860/700/480 px breakpoints.
+- The three-step progressive-disclosure flow, keyboard access and reduced motion still hold, and the
+  vector/never-grow invariants are untouched.
+- `python -m pytest -q` and `ruff check src tests` pass; `node --check` passes for touched scripts.
+- `_version.py` and `CHANGELOG.md` are updated, the portable Windows ZIP builds, and one atomic
+  conventional, GPG-signed commit records the change.

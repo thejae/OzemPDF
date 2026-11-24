@@ -4,26 +4,26 @@
 | --- | --- |
 | Document ID | OZEM-TS-001 |
 | Product | OzemPDF |
-| Specification version | 1.0 |
-| Application version described | **0.2.0** (`src/ozempdf/_version.py`) |
+| Specification version | 2.0 |
+| Application version described | **0.3.3** (`src/ozempdf/_version.py`) |
 | Document status | Current-state specification (descriptive + normative for invariants) |
 | Last updated | 2026-11-24 |
 | Audience | Maintainers, integrators, reviewers, AI coding agents |
-| Related documents | [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), [`CHANGELOG.md`](../CHANGELOG.md), [`pyproject.toml`](../pyproject.toml) |
+| Related documents | [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), [`CHANGELOG.md`](../CHANGELOG.md), [`DESIGN.md`](../DESIGN.md), [`PRODUCT.md`](../PRODUCT.md), [`docs/DISCREPANCIES.md`](DISCREPANCIES.md), [`pyproject.toml`](../pyproject.toml) |
 
-> **Architecture note (v0.3.0).** The PySide6 presentation layer described in §7, and the Qt
-> module references throughout this document, were replaced by an HTML/CSS/JavaScript interface
-> served by the Python engine and wrapped by Electron on Windows, macOS and Linux. The engine
-> chapters (§3–§6, §8–§11, §15) remain normative; §7 describes the superseded Qt implementation
-> and is retained for history. [`README.md`](../README.md) documents the current architecture, and
-> [`docs/DISCREPANCIES.md`](DISCREPANCIES.md) records how every defect in §16 was resolved.
+> **Architecture history.** Versions up to 0.2.0 shipped a PySide6 desktop GUI. From 0.3.0 the
+> presentation layer is plain HTML/CSS/JavaScript served by the Python engine over a loopback HTTP
+> API, wrapped by an Electron shell on the desktop. The Qt chapters of the 1.0 specification were
+> replaced, not annotated: §7 now describes the shipped interface and §15.3 the HTTP API. The engine
+> chapters (§3–§6, §8–§11, §15.1–§15.2) keep their original intent with the behaviour updated to the
+> current tree.
 
-> **Authority.** This document describes the implementation as it exists in source at version
-> 0.2.0. Where prose in the README or locale catalog disagrees with observable behaviour, the
-> behaviour of `src/ozempdf/**` is authoritative and the disagreement is recorded in
-> [§16 Known limitations and discrepancies](#16-known-limitations-and-discrepancies).
-> Normative project rules live in [`AGENTS.md`](../AGENTS.md); this specification restates them
-> and adds precision, it does not relax them.
+> **Authority.** This document describes the implementation as it exists in source at version 0.3.3.
+> Where prose in the README or a locale catalog disagrees with observable behaviour, the behaviour of
+> `src/ozempdf/**` is authoritative and the disagreement is recorded in
+> [§16](#16-defect-ledger-and-known-limitations). Normative project rules live in
+> [`AGENTS.md`](../AGENTS.md); this specification restates them and adds precision, it does not relax
+> them.
 
 ---
 
@@ -35,7 +35,7 @@
 4. [Compression pipeline specification](#4-compression-pipeline-specification)
 5. [Batch engine](#5-batch-engine)
 6. [Command-line interface](#6-command-line-interface)
-7. [Desktop GUI](#7-desktop-gui)
+7. [Web interface and desktop shell](#7-web-interface-and-desktop-shell)
 8. [Localization subsystem](#8-localization-subsystem)
 9. [Non-functional requirements](#9-non-functional-requirements)
 10. [Security and safety analysis](#10-security-and-safety-analysis)
@@ -44,7 +44,7 @@
 13. [Build, packaging and release](#13-build-packaging-and-release)
 14. [Extensibility guide](#14-extensibility-guide)
 15. [Interface reference](#15-interface-reference)
-16. [Known limitations and discrepancies](#16-known-limitations-and-discrepancies)
+16. [Defect ledger and known limitations](#16-defect-ledger-and-known-limitations)
 17. [Future work](#17-future-work)
 - [Appendix A — File inventory](#appendix-a--file-inventory)
 - [Appendix B — JSON schemas](#appendix-b--json-schemas)
@@ -57,61 +57,54 @@
 
 ### 1.1 Purpose
 
-OzemPDF is a cross-platform desktop and command-line application that reduces the file size of
-PDF documents **without re-distilling pages**. It never rasterizes pages and never rewrites page
-content streams (vector operators `m`, `l`, `c`, `re`, `S`, `f`, … or text operators `BT`, `ET`,
-`Tj`, `TJ`). Instead it performs object-level surgery on embedded raster images, embedded font
-programs, deflate streams, metadata and cross-reference structures.
+OzemPDF is a cross-platform application that reduces the file size of PDF documents without
+touching what they say. It is deliberately narrow: it shrinks embedded raster images, redundant
+resources, bloated stream encoding, embedded font subsets and application-private junk, and it
+refuses every transformation that would rewrite a page. Two invariants carry the product's promise —
+pages are never rasterized or regenerated, and no output is ever larger than its input.
 
-The distinguishing claim of the product is the combination of:
-
-- **100 % vector and text preservation** by construction, and
-- a **strict never-grow guardrail** that guarantees an output file is never larger than its input
-  (except for the explicitly opted-in unlock/flatten exception, see [§4.8](#48-never-grow-guardrail)).
+It is used by three kinds of people: someone who needs to e-mail a scanned document under a portal
+limit, an operations team that slims a folder of invoices every month from a script, and a designer
+who needs to prove the result still looks right before handing it over.
 
 ### 1.2 Scope
 
-**In scope**
+In scope:
 
-- Single-file and recursive-directory PDF compression.
-- Image re-encoding (lossless and perceptual), `/SMask` handling, palette packing.
-- Content-hash deduplication of images, ICC profiles and fonts.
-- Embedded font subsetting and table compaction.
-- Structural bloat removal (`/PieceInfo`, `/Thumb`, optional XMP/`/Info`).
-- Deflate recompression (Zopfli) and PDF 1.5+ object-stream packing.
-- Owner-encryption unlock, digital-signature appearance flattening, `/Perms` removal.
-- Four-category byte accounting and reporting.
-- A three-step PySide6 desktop GUI, a batch CLI, JSON reporting, and JSON localization.
+- A local interface (desktop window or browser) for adding files, choosing a preset, running a
+  batch, reading the savings breakdown, and comparing pages before and after.
+- A command-line interface with the same engine, deterministic exit codes and a JSON report.
+- Object-level PDF optimisation with a never-grow guardrail and atomic output writes.
+- Deliberate handling of encrypted and signed documents, including re-signing with a PKCS#12
+  certificate.
+- English UI copy through a catalog system that accepts new languages without a rebuild.
 
-**Out of scope**
+Out of scope:
 
-- OCR, text extraction, content editing, page manipulation (rotate/crop/merge/split).
-- Cryptographic signature **preservation** (signature flattening intentionally invalidates the
-  signature; see [§10.3](#103-digital-signatures)).
-- PDF/A or PDF/X conformance conversion and validation.
-- Encryption of output (outputs are always unencrypted).
-- Network services, telemetry, or cloud processing.
+- Editing, merging, splitting, OCR, or rendering new documents.
+- Password recovery. Owner restrictions are removed because the document is already readable with
+  the empty user password; an open password or a private key must be supplied by the owner.
+- Preserving digital signatures through compression. A signature covers the bytes it was made over,
+  so a compressed document is by definition unsigned; the app either flattens the signature
+  (with consent) or re-signs the result.
+- Cloud storage, accounts, telemetry, or any network access.
 
 ### 1.3 Conventions
 
-- **MUST / MUST NOT / SHOULD / MAY** carry RFC 2119 meaning.
-- Requirement identifiers: `INV-*` (invariants), `FR-<area>-<n>` (functional),
-  `NFR-<n>` (non-functional), `CON-<n>` (project/engineering constraints).
-- Paths are repository-relative POSIX paths unless stated otherwise.
-- Byte sizes are binary (`KiB`) but formatted as `KB`/`MB`/`GB` in the UI.
-- `pdf` always denotes an open `pikepdf.Pdf` instance.
+- `MUST`, `MUST NOT`, `SHOULD` are normative. Invariants are `INV-n`, functional requirements
+  `FR-<area>-n`, non-functional requirements `NFR-n`, constraints `CON-n`, defects `D-nn`.
+- Paths are repository-relative POSIX paths. Line counts are indicative, not contractual.
+- "Effective DPI" means image pixels divided by the size the image occupies on the page, after the
+  page's transformation matrix — not the image's nominal resolution.
 
 ### 1.4 References
 
-| Ref | Subject |
-| --- | --- |
-| ISO 32000-1 | PDF 1.7 specification (graphics state, CTM, XObjects, fonts, signatures) |
-| ISO/IEC 15948 | PNG specification (scanline filters, Paeth predictor) |
-| RFC 1950 | zlib compressed data format (`/FlateDecode`) |
-| RFC 3161 / PKCS#7 | Detached signature byte-range digests (invalidated by flattening) |
-| Keep a Changelog 1.1.0 / SemVer 2.0.0 | Release and versioning conventions |
-| pikepdf / libqpdf docs | Object model, `parse_content_stream`, `ObjectStreamMode` |
-| fontTools.subset docs | `retain_gids`, table dropping, subsetter options |
+- PDF 1.7 / ISO 32000-1:2008 — object model, filters, `/DecodeParms` predictor 15, encryption,
+  signatures.
+- `pikepdf` documentation — object model, `save` parameters, encryption handling.
+- `fontTools.subset` documentation — `retain_gids` and table selection.
+- PKCS#12 / RFC 7292; RFC 3161 for timestamping.
+- WCAG 2.2 AA — contrast and focus requirements for the interface.
 
 ---
 
@@ -121,30 +114,35 @@ The distinguishing claim of the product is the combination of:
 
 | Surface | Entry point | Consumer |
 | --- | --- | --- |
+| Desktop app | `OzemPDF.exe` (Electron 38) → spawns the engine → loads its local URL | End users |
 | Console script `ozempdf` | `ozempdf.__main__:main` → `ozempdf.cli:run_cli` | Shell, CI, scripts |
-| GUI script `ozempdf-gui` | `ozempdf.gui:launch_gui` | Desktop, start menu |
+| Local server | `ozempdf --serve [--port N] [--no-browser]` | Browser fallback, development, tests |
 | Module execution | `python -m ozempdf` | Development |
-| Frozen binary | PyInstaller `dist/OzemPDF[.exe|.app]` | End users |
+| Frozen engine | PyInstaller `dist/engine/ozempdf-engine/ozempdf-engine.exe` | Bundled inside the desktop app |
 
-Invoking `ozempdf` with **no arguments** launches the GUI. This is an intentional product
-decision: the desktop experience is the default.
+Invoking `ozempdf` with **no arguments** launches the interface. In a checkout that means starting
+the local server and opening the default browser; in the packaged app the Electron shell does it. The
+desktop experience is the default; the CLI is one flag away.
 
 ### 2.2 Goals
 
 - `G1` — Reduce embedded-raster and stream bloat by a large factor while keeping text and vectors
   pixel-identical.
 - `G2` — Never produce a larger file than the input (see `INV-2`).
-- `G3` — Work identically on Windows, macOS and Linux with no external binaries
-  (no Ghostscript, no Poppler, no qpdf CLI).
-- `G4` — Give the user a comprehensible, progressive, theme-capable desktop workflow.
+- `G3` — Work identically on Windows, macOS and Linux with no external binaries (no Ghostscript, no
+  Poppler, no qpdf CLI).
+- `G4` — Give the user a comprehensible, progressive, theme-capable interface that runs in a normal
+  browser and in a native window from the same source.
 - `G5` — Be scriptable: stable CLI flags, deterministic exit codes, machine-readable JSON.
 
 ### 2.3 Non-goals
 
-- `NG1` — Maximum-ratio compression at any perceptual cost. Even "Max Slim" is bounded to
-  `110 DPI` and JPEG `Q=75`.
+- `NG1` — Maximum-ratio compression at any perceptual cost. Even "Max Slim" is bounded to `110 DPI`
+  and JPEG `Q=75`.
 - `NG2` — Re-distillation or rendering of pages.
 - `NG3` — Being a general PDF library; the public API is small and pipeline-oriented.
+- `NG4` — Being a web service. The server binds loopback only and has no accounts, uploads to a
+  remote host, or persistence beyond the settings file.
 
 ### 2.4 Quality invariants
 
@@ -154,23 +152,25 @@ These are normative and are enforced by review, tests, or code structure.
 | --- | --- | --- |
 | `INV-1` | Pages are never rasterized. Page `/Contents` streams are never regenerated. Vector and text operators are never rewritten. | No code path writes page content except signature flattening, which **appends** a `q … cm /Name Do Q` sequence. |
 | `INV-2` | An individual image stream is replaced only if the replacement payload is strictly smaller. | `if len(new) < orig_len` at every `_apply_stream_update` call site. |
-| `INV-3` | The final output PDF is never larger than the input. | Post-save size check in `pipeline.py`; original is copied instead. |
-| `INV-4` | Cross-platform: no OS-specific paths, shell-outs, or native-code paths. | `pathlib`, Qt abstractions, `QStandardPaths`, `sys._MEIPASS` handling. |
-| `INV-5` | All user-facing strings in GUI and CLI go through `ozempdf.i18n.t`. | `AGENTS.md` §2; violations are defects (see `D-11`). |
-| `INV-6` | Every module/class/public function carries type annotations and Google-style docstrings. | `AGENTS.md` §4. |
+| `INV-3` | The final output PDF is never larger than the input. | Post-save size check in `pipeline.py`; the original is copied instead. |
+| `INV-4` | Cross-platform: no OS-specific paths, shell-outs or native-code paths outside the two documented modules. | `pathlib`, `sys._MEIPASS` handling in `resources.py`; `os.name` branches only in `settings.py` (data locations) and `server.py` (`_open_in_os`). |
+| `INV-5` | All user-facing strings go through `ozempdf.i18n.t` in Python and `data-i18n`/`t()` in the UI. | `AGENTS.md`; tests assert key coverage and zero orphans. |
+| `INV-6` | Every module, class and public function carries type annotations and a Google-style docstring. | `AGENTS.md`. |
+| `INV-7` | Inputs are opened **read-only**; every output write is atomic (temp file in the destination directory, then `os.replace`). | `unlock._open_pdf` has no `allow_overwriting_input`; a test asserts it; the pipeline never writes to the source path. |
 
 ### 2.5 Layered architecture
 
 ```mermaid
 flowchart TB
     subgraph Presentation
-        G[PySide6 GUI<br/>main_window, preview_dialog,<br/>breakdown_widget, theme, icons, fonts]
-        C[CLI<br/>cli.py, __main__.py]
+        W[Web client<br/>index.html · styles.css · app.js]
+        E[Electron shell<br/>main.js · preload.js]
+        C[CLI<br/>cli.py · __main__.py]
     end
     subgraph Orchestration
+        S[Local HTTP server<br/>server.py: AppState, run thread, thumbnail pool]
         B[Batch engine<br/>batch.py]
-        Q[Qt workers<br/>worker.py]
-        S[Settings<br/>settings.py]
+        SET[Settings<br/>settings.py]
     end
     subgraph Core engine
         P[Pipeline<br/>pipeline.py]
@@ -180,32 +180,39 @@ flowchart TB
         A4[image_optimizer]
         A5[font_optimizer]
         A6[stream_optimizer]
+        A7[signing]
     end
     subgraph Foundation
         CFG[config.py]
         I18N[i18n.py + locales/en.json]
-        EXT[pikepdf · Pillow · zopfli<br/>fontTools · pypdfium2]
+        EXT[pikepdf · Pillow · zopfli<br/>fontTools · pypdfium2 · pyhanko]
     end
-    G --> Q --> B --> P
+    W <--> S
+    E --> W
+    E --> S
     C --> B
-    G --> S
-    P --> A1 & A2 & A3 & A4 & A5 & A6
-    A1 & A2 & A3 & A4 & A5 & A6 --> EXT
+    S --> B --> P
+    P --> A1 & A2 & A3 & A4 & A5 & A6 & A7
+    A1 & A2 & A3 & A4 & A5 & A6 & A7 --> EXT
     P --> CFG
-    G & C --> I18N
+    S --> SET
+    S & C --> I18N
 ```
 
-**Dependency rule.** `engine/*` MUST NOT import `gui/*` or `cli.py`. `gui/*` MAY import `engine`
-and `i18n`. `batch.py` MAY import `pipeline`; `pipeline.py` MUST NOT import `batch.py`.
+**Dependency rule.** `engine/*` MUST NOT import `server`, `cli` or `web`. `server.py` MAY import
+`engine` and `i18n`. `batch.py` MAY import `pipeline`; `pipeline.py` MUST NOT import `batch.py`.
+The web client has no build step and no imports at all: it is three static files plus the bundled
+fonts.
 
 ### 2.6 Runtime modes
 
 | Mode | Process model | Notes |
 | --- | --- | --- |
-| GUI single file | UI thread + `ThumbnailLoaderThread`; compression in `BatchCompressionWorker` (QThread) that itself runs in-process for one file | UI thread never blocks |
-| GUI batch | `BatchCompressionWorker` → `ProcessPoolExecutor` | One OS process per file, up to `max_workers` |
+| Desktop app | Electron main process + one engine child (`--serve`); compression in a `ProcessPoolExecutor` inside the engine | The window is a browser view onto the local server; the shell never compresses |
+| Browser | One engine process serving the UI and the API | Same UI, same API; drops are staged because a browser cannot reveal real paths |
+| CLI single file | In-process, no pool | Fast path for one document |
 | CLI batch | `ProcessPoolExecutor` from the main process | Bypassed for a single file |
-| Frozen app | Same as above, plus `multiprocessing.freeze_support()` | Required for `--onefile --windowed` on Windows |
+| Frozen engine | Same as above plus `multiprocessing.freeze_support()` | Required for the PyInstaller build on Windows |
 
 ### 2.7 Technology stack
 
@@ -216,9 +223,13 @@ and `i18n`. `batch.py` MAY import `pipeline`; `pipeline.py` MUST NOT import `bat
 | `zopfli` | `>=0.2.2` | High-density deflate (zlib-wrapped) |
 | `fonttools` | `>=4.40.0` | SFNT parsing and subsetting |
 | `pypdfium2` | `>=4.20.0` | Page rasterization for thumbnails and the inspector |
-| `PySide6` | `>=6.5.0` | Qt 6 GUI, `QtSvg` icon rendering |
-| `pytest` (dev) | `>=7.4.0` | Test suite |
-| `pyinstaller` (dev) | `>=6.0.0` | Standalone packaging |
+| `pyhanko` | `>=0.25.0` | PKCS#12 signing and RFC 3161 timestamps |
+| `Electron` | `^38.0.0` (desktop shell only) | Native window, file pickers, close guard |
+| `pytest`, `ruff`, `pyinstaller` (dev) | `>=7.4`, latest, `>=6.0` | Tests, lint, frozen engine |
+
+The interface itself uses no runtime library: plain ES2020 modules in the browser, plain CSS with
+custom properties, no bundler and no transpiler. The Python side uses only the standard library for
+the server (`http.server`, `json`, `threading`).
 
 Python floor: **3.10** (`requires-python = ">=3.10"`); CI/reference interpreter: 3.14.
 
@@ -241,6 +252,12 @@ class OutputMode(str, Enum):
     OVERWRITE = "overwrite"    # atomic in-place replacement
 ```
 
+`from_preset` accepts either a string or a `PresetMode` member. An unknown string resolves to
+Balanced; `custom` has no stored definition and is produced only by editing a knob at runtime. A
+typed caller passing the enum gets that enum's configuration — `str()` of a `str`-Enum is not its
+value on Python 3.11+, which is why the branch exists and why
+`tests/test_settings.py::test_from_preset_accepts_an_enum_member` covers it.
+
 ### 3.2 `CompressionConfig`
 
 A `@dataclass(slots=True)` carrying every knob that affects the pipeline. Defaults equal the
@@ -251,27 +268,39 @@ A `@dataclass(slots=True)` carrying every knob that affects the pipeline. Defaul
 | `preset` | `PresetMode` | `BALANCED` | enum | informational + UI state |
 | `strict_lossless` | `bool` | `False` | — | selects image-optimizer Mode A vs Mode B |
 | `enable_downsampling` | `bool` | `True` | — | gates Lanczos downsampling |
-| `target_dpi` | `int` | `150` | 72–600 (CLI); 72–300 (GUI slider) | downsampling target |
-| `downsample_threshold_dpi` | `int` | `220` | `round(target_dpi * 1.45)` | only downsample above this effective DPI |
-| `jpeg_quality` | `int` | `85` | 50–98 (CLI); 50–95 (GUI) | progressive JPEG quality |
-| `quantize_ui_screenshots` | `bool` | `True` | — | enables perceptual `/Indexed` candidate |
-| `ui_palette_colors` | `int` | `256` | 64–256 | palette size for UI raster candidate |
+| `target_dpi` | `int` | `150` | 72–600 (one range everywhere) | downsampling target |
+| `downsample_threshold_dpi` | `int` | `218` | `max(target_dpi + 1, round(target_dpi * 1.45))` | only downsample above this effective DPI |
+| `jpeg_quality` | `int` | `85` | 50–98 (one range everywhere) | progressive JPEG quality |
+| `quantize_ui_screenshots` | `bool` | `True` | — | enables the perceptual `/Indexed` candidate |
+| `ui_palette_colors` | `int` | `256` | 64–256 | palette size for the UI raster candidate |
 | `zopfli_iterations` | `int` | `15` | 5–50 | Zopfli passes for every deflate site |
 | `strip_opaque_smask` | `bool` | `True` | — | delete 100 %-opaque `/SMask` streams |
 | `deduplicate_resources` | `bool` | `True` | — | run Stage 3 |
 | `use_object_streams` | `bool` | `True` | — | `ObjectStreamMode.generate` vs `preserve` |
 | `subset_fonts` | `bool` | `True` | — | run Stage 5a |
 | `strip_bloat` | `bool` | `True` | — | remove `/PieceInfo`, `/Thumb` |
-| `unlock_and_flatten_signatures` | `bool` | `True` | — | run Stage 1 signature pass |
+| `unlock_and_flatten_signatures` | `bool` | **`False`** | — | run the signature-flattening pass (consent required in the UI) |
 | `strip_metadata` | `bool` | `False` | — | remove XMP + `/Info` |
 | `output_mode` | `OutputMode` | `SUFFIX` | enum | destination strategy |
 | `output_suffix` | `str` | `"_compressed"` | non-empty after strip | suffix used by `OutputMode.SUFFIX` |
-| `output_dir` | `Path \| None` | `None` | existing dir | root for `OutputMode.CUSTOM_FOLDER` |
-| `max_workers` | `int \| None` | `None` | ≥1 | `None` → `min(total, cpu_count)` |
-| `password` | `str` | `""` | — | user open-password, tried first |
+| `output_dir` | `str` | `""` | existing dir | root for `OutputMode.CUSTOM_FOLDER` |
+| `max_workers` | `int` | `0` | 0 = auto | `0` → `min(total, cpu_count)` |
+| `password` | `str` | `""` | — | caller-supplied open password; never persisted |
+| `sign_after_slimming` | `bool` | `False` | — | re-sign the output with the configured PKCS#12 |
+| `sign_pkcs12_path` | `str` | `""` | readable file | certificate bundle |
+| `sign_pkcs12_password` | `str` | `""` | — | never persisted, never reported |
+| `sign_field_name` | `str` | `"OzemPDF Signature"` | non-empty | signature field name |
+| `sign_reason` | `str` | `"Slimmed with OzemPDF"` | — | `/Reason` |
+| `sign_location` | `str` | `""` | — | `/Location` |
+| `sign_tsa_url` | `str` | `""` | http(s) URL | RFC 3161 timestamp authority |
 
-`copy_with(**overrides)` is a thin `dataclasses.replace` wrapper used to freeze a snapshot for
-workers and to rebuild configs from settings.
+`copy_with(**overrides)` returns a clamped copy (`dataclasses.replace` + `clamped()`), used to freeze
+a snapshot for workers and to rebuild configurations from settings. `to_dict(public=True)` omits
+secrets, and `from_dict` ignores unknown keys, so the JSON contract is forwards compatible.
+
+`clamped()` enforces every range and fixes derived values: a strict-lossless configuration forces
+`enable_downsampling = False` (the mode is a real flag, not a slider position), and the threshold is
+recomputed as `max(target_dpi + 1, round(target_dpi * 1.45))`.
 
 ### 3.3 Built-in presets
 
@@ -280,7 +309,7 @@ workers and to rebuild configs from settings.
 | `strict_lossless` | **True** | False | False |
 | `enable_downsampling` | **False** | True | True |
 | `target_dpi` | 600 | 150 | 110 |
-| `downsample_threshold_dpi` | 900 | 220 | 150 |
+| `downsample_threshold_dpi` | 900 | 218 | 160 |
 | `jpeg_quality` | 98 | 85 | 75 |
 | `quantize_ui_screenshots` | **False** | True | True |
 | `ui_palette_colors` | 256 | 256 | **128** |
@@ -290,16 +319,17 @@ workers and to rebuild configs from settings.
 | `use_object_streams` | True | True | True |
 | `subset_fonts` | True | True | True |
 | `strip_bloat` | True | True | True |
-| `unlock_and_flatten_signatures` | True | True | True |
+| `unlock_and_flatten_signatures` | **False** | **False** | **False** |
 | `strip_metadata` | False | False | **True** |
+| `sign_after_slimming` | False | False | False |
 
 Notes:
 
-- `from_preset("custom")` is **not** a distinct branch; it falls through to the Balanced branch.
-  Custom mode is produced only by editing an advanced knob at runtime.
-- Any advanced-knob edit in the GUI forces `preset = CUSTOM` and `strict_lossless = False`
-  (`_on_advanced_Option_changed`). Touching a knob therefore leaves Strict Lossless; the user must
-  re-select the preset to return to it.
+- Signature flattening is **off in every preset** (D-14). Turning it on — in the drawer or with
+  `--flatten-signatures` — is an explicit act with a stated consequence.
+- Any advanced-knob edit in the interface forces `preset = CUSTOM` and `strict_lossless = False`.
+  The user must re-select Strict Lossless to return to it.
+- Re-signing is never part of a preset: it needs a certificate the preset cannot know about.
 
 ### 3.4 Byte accounting: `CategoryBreakdown`
 
@@ -307,41 +337,52 @@ Five counters representing the four user-facing categories plus the total.
 
 | Field | Classification rule |
 | --- | --- |
-| `images_bytes` | `/Subtype /Image` streams, their `/SMask` and `/Mask` streams (a `/Thumb` that is itself an `/Subtype /Image` stream is counted here too) |
+| `images_bytes` | `/Subtype /Image` streams and their `/SMask`/`/Mask` streams — **unless** the object is a page `/Thumb`, which is classified by role first (D-16) |
 | `fonts_bytes` | `/FontDescriptor` `/FontFile`, `/FontFile2`, `/FontFile3`; `/ToUnicode` CMaps; streams with `/Subtype /Font1`, `/Type1C`, `/CIDFontType0C`, `/OpenType`; streams carrying `/Length1`–`/Length3` |
 | `vectors_bytes` | page `/Contents` streams (direct or array) and `/Subtype /Form` XObjects |
-| `metadata_bytes` | `/Type /Metadata` and `/Subtype /XML` streams, **plus every unclassified stream**, **plus** `file_size - sum(streams)` (xref/dictionary overhead) |
+| `metadata_bytes` | `/Type /Metadata` and `/Subtype /XML` streams, page `/Thumb` images, **plus every unclassified stream**, **plus** `file_size - sum(streams)` (xref/dictionary overhead) |
 | `total_bytes` | `file_size` when supplied, else the maximum of the stream sum |
 
+The audit sums to the file size by construction: unclassified bytes are counted in
+`metadata_bytes`, so `images + fonts + vectors + metadata == total`. Objects are de-duplicated by
+`(objgen)` because `pdf.objects` yields the same object more than once for shared resources.
 Aggregation helpers: `__add__` and `add_inplace` (used by `BatchSummary`).
 
 ### 3.5 Stage statistics
 
 | Type | Fields |
 | --- | --- |
-| `UnlockStats` | `was_encrypted`, `signatures_flattened`, `perms_removed` |
+| `UnlockStats` | `was_encrypted`, `signatures_flattened`, `perms_removed`, `protection_kind` |
 | `DeduplicationStats` | `duplicate_images_merged`, `duplicate_icc_merged`, `duplicate_fonts_merged`, `bytes_saved_estimate` |
 | `ImageOptimizationStats` | `images_inspected`, `images_optimized`, `opaque_smasks_stripped`, `images_downsampled`, `images_indexed`, `bytes_saved` |
-| `FontOptimizationStats` | `font_streams_inspected`, `font_streams_optimized`, `bytes_saved`, property alias `fonts_subsetted` |
-| `StreamOptimizationStats` | `pieceinfo_removed`, `thumbnails_removed`, `metadata_removed`, `streams_recompressed`, `bytes_saved`, property alias `piece_info_removed` |
+| `FontOptimizationStats` | `font_streams_inspected`, `font_streams_optimized`, `cmaps_optimized`, `bytes_saved`, alias `fonts_subsetted` |
+| `StreamOptimizationStats` | `pieceinfo_removed`, `thumbnails_removed`, `metadata_removed`, `streams_recompressed`, `bytes_saved`, alias `piece_info_removed` |
 
 ### 3.6 `FileCompressionResult`
 
 The unit of reporting for one file. Derived properties: `bytes_saved = max(0, original -
-compressed)`, `reduction_percent`. `to_dict()` yields the schema in
-[Appendix B.1](#b1-filecompressionresult).
+compressed)` and `reduction_percent`. `to_dict()` yields the schema in
+[Appendix B.1](#b1-filecompressionresult). Fields, in order: `input_path`, `output_path`, `success`,
+`error_message`, `page_count`, `original_bytes`, `compressed_bytes`, `before_breakdown`,
+`after_breakdown`, `images_inspected`, `images_optimized`, `opaque_smasks_stripped`,
+`images_downsampled`, `images_indexed`, `duplicate_images_merged`, `font_streams_optimized`,
+`cmaps_optimized`, `signatures_flattened`, `was_encrypted`, `protection_kind`,
+`protection_removed`, `required_password`, `kept_original_guardrail`, `already_optimal`, `signed`,
+`output_mode`, `elapsed_seconds`.
 
-### 3.7 `BatchJobItem` and `BatchSummary`
+### 3.7 Queue items and `BatchSummary`
 
-`BatchJobItem` is GUI/batch state: `input_path`, `base_folder`, `relative_label`, `page_count`,
-`original_bytes`, `status`, `result`, `thumbnail_png`.
+`BatchJobItem` is interface/batch state: `id`, `input_path`, `base_folder`, `relative_label`,
+`page_count`, `original_bytes`, `status`, `result`, `thumbnail_png`, `protection_kind`,
+`required_password`.
 
 `status` domain: `"queued"`, `"new_queued"`, `"processing"`, `"done"`, `"error"`.
 
-`BatchSummary` aggregates `results` plus `elapsed_seconds` and exposes `total_files`,
+`BatchSummary` holds `results` and `elapsed_seconds` and exposes `total_files`,
 `succeeded_count`, `failed_count`, `total_original_bytes`, `total_compressed_bytes`,
-`total_bytes_saved`, `total_reduction_percent`, `aggregate_before_breakdown`,
-`aggregate_after_breakdown`. Byte totals count **successful files only**; `total_files` counts all.
+`total_bytes_saved`, `total_reduction_percent`, `protection_removed_count`,
+`aggregate_before_breakdown`, `aggregate_after_breakdown`. Byte totals count **successful files
+only**; `total_files` counts all.
 
 ### 3.8 Output path resolution
 
@@ -354,8 +395,8 @@ compressed)`, `reduction_percent`. `to_dict()` yields the schema in
 | `CUSTOM_FOLDER` with `output_dir`, no `base_folder` | `output_dir / input_path.name` |
 | `SUFFIX` (default) | `parent / f"{stem}{suffix}{ext}"`; suffix falls back to `_compressed` |
 
-Collisions are **not** detected: two identical inputs from different roots can map to the same
-output name when `base_folder` is absent.
+Collisions are detected before the run: `_unique_outputs` appends `-2`, `-3`, … to the stem until
+every target is distinct (D-18). Two same-named inputs from different roots therefore both survive.
 
 ---
 
@@ -366,20 +407,22 @@ output name when `base_folder` is absent.
 `compress_pdf_file(input_path, output_path, config)` is the single entry point. Sequence:
 
 ```text
-0. Resolve paths, stat input, mkdir output parent
-1. Stage 1  open_and_unlock_pdf()          -> pdf, UnlockStats
-2. Stage 2  audit_pdf_bytes(pdf, file_size) -> before_breakdown
-            calculate_effective_image_dpis(pdf) -> {objgen: dpi}
-3. Stage 3  deduplicate_resources(pdf)      [if deduplicate_resources]
-4. Stage 4  optimize_all_images(pdf, dpis, cfg)
-5. Stage 5a optimize_fonts(pdf, cfg)
-6. Stage 5b strip_structural_bloat(pdf, cfg, stats)
-7. Stage 6  recompress_content_streams(pdf, cfg, stats)
-8. pdf.remove_unreferenced_resources()      [best effort, exceptions swallowed]
-9. Save to temp file in destination dir, close pdf
+0.  Resolve paths, stat input, mkdir output parent
+1.  Stage 1  open read-only, unlock, classify protection   -> pdf, UnlockStats
+    Stage 1b flatten signatures                            [only with consent]
+2.  Stage 2  audit_pdf_bytes(pdf, file_size)               -> before_breakdown
+             calculate_effective_image_dpis(pdf)           -> {objgen: dpi}
+3.  Stage 3  deduplicate_resources(pdf)                    [if deduplicate_resources]
+4.  Stage 4  optimize_all_images(pdf, dpis, cfg)
+5.  Stage 5a optimize_fonts(pdf, cfg)
+6.  Stage 5b strip_structural_bloat(pdf, cfg, stats)
+7.  Stage 6  recompress_content_streams(pdf, cfg, stats)
+8.  pdf.remove_unreferenced_resources()                    [best effort, exceptions swallowed]
+9.  Save to a temp file in the destination directory, close pdf
 10. Guardrail check on temp size vs original
 11. Audit output PDF (after_breakdown)
-12. os.replace(temp, output) atomically
+12. Stage 7  sign the temp file                             [if sign_after_slimming]
+13. os.replace(temp, output) atomically
 ```
 
 **FR-PIPE-1** Stages MUST execute in the order above; Stage 3 precedes Stage 4 so duplicate images
@@ -387,11 +430,16 @@ are collapsed before expensive re-encoding.
 
 **FR-PIPE-2** A non-file input path returns `success=False` with `error_message` and no exception.
 
-**FR-PIPE-3** Any unhandled exception MUST be converted into `FileCompressionResult(success=False,
-error_message=str(exc))`; the CLI and GUI never see an exception.
+**FR-PIPE-3** Any unhandled exception MUST become `FileCompressionResult(success=False,
+error_message=…)`; the CLI and the interface never see an exception.
 
 **FR-PIPE-4** The temporary file MUST live in the destination directory (same volume) so the final
 `os.replace` is atomic. Naming: `.ozempdf_<random>.tmp.pdf`.
+
+**FR-PIPE-5** The input MUST be opened read-only. The pipeline never writes to the source path, so
+cloud placeholders, read-only media and files held open by another application work. A
+`PermissionError` becomes an actionable message that names the blocked path and suggests closing the
+application that holds it or downloading the cloud copy; it is never a bare `[Errno 13]`.
 
 ### 4.2 Save parameters
 
@@ -404,229 +452,136 @@ pdf.save(
     compress_streams=True,
     stream_decode_level=pikepdf.StreamDecodeLevel.generalized,
     recompress_flate=False,   # preserve higher-density Zopfli streams
+    encryption=False,         # output is always a plain PDF
 )
 ```
 
 `recompress_flate=False` is load-bearing: letting qpdf re-deflate would replace Zopfli output with
-plain zlib and can grow the file.
+plain zlib and can grow the file. `encryption=False` is deliberate — an unlocked document stays
+unlocked, and users handling regulated material are told so in the interface and the docs.
 
-### 4.3 Stage 1 — Unlock and digital-signature flattening (`engine/unlock.py`)
+### 4.3 Stage 1 — Open, unlock, classify protection (`engine/unlock.py`)
 
-**FR-UNL-1** Open the PDF by trying the **empty user password first**, then the caller-supplied
-password when one was given. The empty password opens owner-restricted documents (printing/copying/
-editing restrictions), which is the permission-only case; no password dictionary is ever tried
-(D-15). If none opens the document, raise `PasswordRequiredError`; if the encryption scheme is
-certificate-based or otherwise unsupported, raise `UnsupportedProtectionError`. The stage reports
-`protection_kind` (`none` / `permissions` / `password` / `unsupported`) and `protection_removed`.
+**FR-UNL-1** Open with the **empty user password first**, then the caller-supplied password when one
+was given. The empty password opens owner-restricted documents, which is the permission case; no
+dictionary or brute force is ever attempted (D-15).
 
-- Empty user password decrypts owner-restricted documents (`no_modify`, `no_extract`, `no_print`).
-- `pikepdf.open(..., allow_overwriting_input=True)` so in-place overwrite is permitted.
+**FR-UNL-2** If neither opens the document, raise `PasswordRequiredError`. If the encryption scheme
+is certificate-based or otherwise unsupported, raise `UnsupportedProtectionError`.
 
-**FR-UNL-2** Record `was_encrypted = bool(pdf.is_encrypted)` **before** any modification.
+| Input | `protection_kind` | Behaviour |
+| --- | --- | --- |
+| Not encrypted | `none` | Normal compression |
+| Opens with the empty user password | `permissions` | Decrypted, restrictions removed, plain output. **No password needed.** |
+| Opens only with an open password | `password` | The password is required; `required_password = True`. Supplied once per run, never persisted. |
+| Certificate / public-key, or unsupported filter | `unsupported` | Reported, never guessed at |
 
-**FR-UNL-3** When `flatten_signatures` is true, call `flatten_and_strip_signatures(pdf)`:
+The stage reports `protection_kind` and `protection_removed`; the result carries both, and the batch
+counts unlocked documents.
 
-1. For each page `/Annots` array, classify each annotation with `_is_signature_object`
-   (`/FT /Sig`, `/Type /Sig`, `/V` being `/Type /Sig`, or `/Parent /FT /Sig`).
-2. For a signature widget with a visible appearance, call
-   `_flatten_widget_appearance_to_page`:
-   - Requires `/AP /N` stream and a `/Rect` with non-zero area.
-   - Registers the appearance stream as a page `/Resources /XObject` member named
-     `/OzSigFlat<n>` (made indirect).
-   - Computes scale from `/BBox` (`sx = width / bbox_width`, `sy = height / bbox_height`) and the
-     placement offset `e = tx - bx*sx`, `f = ty - by*sy`.
-   - Appends `q sx 0 0 sy e f cm /OzSigFlat<n> Do Q` to the page contents (`prepend=False`).
-   - Sets `/Subtype /Form` on the appearance if missing. Any failure is swallowed — unlocking must
-     never fail because of a malformed appearance.
-3. Remove signature annotations from `/Annots` (delete the key if the array becomes empty).
-4. Remove signature fields from `/AcroForm /Fields`; delete `/SigFlags` from `/AcroForm`.
-5. Delete `/Perms` from `/Root` (DocMDP / UR3 locks).
-6. Count distinct signature objects by `objgen` (objects with `objgen == (0, 0)` always count).
+**FR-UNL-3** Signature flattening appends a `q … cm /Name Do Q` sequence that paints an `OzSigFlat`
+appearance, then removes `/Sig`, `/SigFields` and `/Perms`. It is off by default and requires explicit
+consent in the interface. Flattening is **not** signature preservation: the byte-range digest cannot
+survive, and the document is unsigned afterwards. Re-signing with a PKCS#12 certificate is the way to
+end up signed again (Stage 7).
 
-**FR-UNL-4** Output is always written unencrypted.
+### 4.4 Stage 2 — Analysis (`engine/analyzer.py`)
 
-**Non-guarantee.** Flattening preserves the *visual stamp*, not the cryptographic signature. See
-[§10.3](#103-digital-signatures).
+- `audit_pdf_bytes(pdf, file_size)` → `CategoryBreakdown` that sums exactly to the file size (see
+  §3.4). Objects are de-duplicated by `objgen`, and a page `/Thumb` is classified by role before
+  subtype.
+- `calculate_effective_image_dpis(pdf)` → `{objgen: effective_dpi}`. Walks each page's resources and
+  the transformation matrix stack (`cm`/`q`/`Q`, recursing into Form XObjects with a visited set) to
+  get the size an image actually occupies, then divides image pixels by that size. An image drawn
+  small therefore has a high effective DPI and is a downsampling candidate.
 
-### 4.4 Stage 2 — Byte audit and effective-DPI analysis (`engine/analyzer.py`)
+### 4.5 Stage 3 — Deduplication (`engine/deduplicator.py`)
 
-#### 4.4.1 `audit_pdf_bytes(pdf, file_size)`
+Hashes decoded payloads with SHA-256 per class — images, ICC profiles, font files — and points
+duplicate streams at a single object. Original payloads are never modified here; the saving is
+structural. Opaque `/SMask` streams (all-255 alpha) are deleted in this stage under
+`strip_opaque_smask`: an alpha channel that is entirely opaque is by definition redundant.
 
-Three passes:
+### 4.6 Stage 4 — Images (`engine/image_optimizer.py`)
 
-1. **Role discovery from pages** — page `/Contents` (direct stream or array) → vector set; page
-   `/Thumb` → metadata set.
-2. **Object classification** — over `pdf.objects`:
-   - `/FontDescriptor` → its `/FontFile*` streams → fonts.
-   - `/Font` → `/ToUnicode`, and `/FontDescriptor /FontFile*` → fonts.
-   - Stream `/Subtype /Image` → images, plus its `/SMask` and `/Mask` streams.
-   - Stream `/Subtype` in font subtypes **or** carrying `/Length1|2|3` → fonts.
-   - Stream `/Subtype /Form` → vectors.
-   - `/Type /Metadata` or `/Subtype /XML` → metadata.
-3. **Summation** — sum `len(stream.read_raw_bytes())` per category (fallback to decoded length,
-   then 0 on failure). Unclassified streams fall into metadata. If `file_size > stream_sum`, the
-   difference is added to `metadata_bytes` so categories sum exactly to the file size.
+#### 4.6.1 Modes
 
-**FR-AUD-1** Categories MUST sum to `total_bytes` when `file_size` is supplied.
+| Mode | Trigger | Rule |
+| --- | --- | --- |
+| A — strict lossless | `config.strict_lossless` | Pixels are bit-identical after decode; no resampling, no JPEG re-encode, no lossy palette. Only lossless re-encoding, JPEG bloat stripping and exact-index palettes for images that already use ≤ 256 colours. |
+| B — perceptual | everything else | Downsampling above the threshold, progressive JPEG at `jpeg_quality`, palette candidate for UI graphics. Bounded by `ng1`: Max Slim is 110 DPI / Q75. |
 
-#### 4.4.2 `calculate_effective_image_dpis(pdf)`
+#### 4.6.2 Classification
 
-For each page, walk the content stream with a CTM stack:
+A 160 px thumbnail is analysed: the ratio of flat runs (adjacent identical pixels) above **0.38**
+with a small colour count means `UI_GRAPHIC`; a large palette with few flat runs means `PHOTOGRAPH`;
+a single channel means `MONOCHROME`. This decides whether the `/Indexed` palette candidate is worth
+trying — a photo must not be quantised into 256 colours.
 
-- `q` push CTM; `Q` pop (never below the initial matrix).
-- `cm [a b c d e f]` → `CTM = M_cm × CTM` using the standard PDF row-vector product:
+#### 4.6.3 Candidate selection
 
-  ```text
-  [a1 b1 0]   [a2 b2 0]   [a1a2+b1c2  a1b2+b1d2  0]
-  [c1 d1 0] × [c2 d2 0] = [c1a2+d1c2  c1b2+d1d2  0]
-  [e1 f1 1]   [e2 f2 1]   [e1a2+f1c2+e2  e1b2+f1d2+f2  1]
-  ```
+For each eligible image the stage builds `_Candidate(cost, payload, filter, colorspace,
+decode_parms)` options and applies the cheapest **only if** it is strictly smaller than the original
+payload:
 
-- `Do /Name` resolving to an image in `/Resources /XObject`:
-  - `w_px = /Width`, `h_px = /Height`; skip if either ≤ 0.
-  - Rendered size in points: `w_pt = hypot(a, b)`, `h_pt = hypot(c, d)`; skip if either ≤ 0.5 pt.
-  - `dpi_x = w_px / (w_pt / 72)`, `dpi_y = h_px / (h_pt / 72)`; effective DPI is the **maximum**.
-  - Keep the maximum effective DPI per image `objgen` across all pages.
-- `Do /Name` resolving to a Form XObject: compute `form_ctm = /Matrix × ctm` when `/Matrix`
-  present, recurse with `/Resources` (falling back to the parent resources), guarding against
-  cycles with a per-page `visited_forms` set.
+| # | Condition | Encoding | Colour space |
+| --- | --- | --- | --- |
+| 1 | `UI_GRAPHIC` + RGB + `quantize_ui_screenshots` | `FASTOCTREE` quantise to `min(256, max(16, ui_palette_colors))`, no dither, palette trimmed to the highest used index, `Predictor 15`+Zopfli or raw Zopfli | `/Indexed /DeviceRGB` |
+| 2 | `PHOTOGRAPH`, or no candidate yet | progressive JPEG, `optimize=True`, `subsampling="4:2:0"` for RGB else `0`, then JPEG bloat strip | `/DeviceRGB` or `/DeviceGray` |
+| 3 | `width*height ≤ 1_500_000` | raw Zopfli vs `Predictor 15` + Zopfli | `/DeviceRGB` or `/DeviceGray` |
 
-**FR-AUD-2** DPI MUST be computed from the actual CTM, not from image dimensions alone.
-
-Limitations: text state (`Tf`, font size) is irrelevant to images and ignored; `cm` inside a `TJ`
-array is impossible; images drawn via inline images (`BI … ID … EI`) are not analysed.
-
-### 4.5 Stage 3 — Resource deduplication (`engine/deduplicator.py`)
-
-**FR-DED-1** Images: signature = SHA-256 over the metadata string
-`W|H|BPC|CS|IM|D` plus decoded payload (raw bytes fallback) plus, when present, the `/SMask`
-decoded payload. Signatures are canonicalised in a `dict[str, Stream]`; a later duplicate has its
-dictionary entry re-pointed at the canonical stream object.
-
-**FR-DED-2** Traversal covers every page `/Resources /XObject`, recursing into `/Subtype /Form`
-resources with cycle protection.
-
-**FR-DED-3** ICC profiles: arrays of the form `[/ICCBased <stream>]` are hashed and re-pointed at
-the canonical profile.
-
-**FR-DED-4** Fonts: `/FontDescriptor` `/FontFile|2|3` streams are hashed and re-pointed.
-
-**FR-DED-5** Nothing is deleted here; orphaned duplicates are reclaimed by the save-time garbage
-collection and `remove_unreferenced_resources()`. `bytes_saved_estimate` is an estimate from
-`read_raw_bytes()` of the duplicates that were displaced.
-
-### 4.6 Stage 4 — Image optimizer (`engine/image_optimizer.py`)
-
-Entry point `optimize_all_images(pdf, effective_dpis, config)` iterates unique
-`/Subtype /Image` streams and calls `optimize_single_image` once per `objgen`.
-
-#### 4.6.1 Common prelude (both modes)
-
-1. `images_inspected += 1`.
-2. Skip if `/ImageMask` is true (stencil masks are not raster images).
-3. If `/SMask` present → `_optimize_smask_stream`:
-   - Fully opaque test: `BitsPerComponent == 8`, `len(decoded) == w*h`, and
-     `decoded.count(0xFF) == len(decoded)` → delete `/SMask`, `opaque_smasks_stripped += 1`,
-     add the removed raw length to `bytes_saved`, and mark "no active smask".
-   - Otherwise, if 8-bit and correctly sized: build raw-Zopfli vs `Predictor 15` Zopfli
-     candidates, write the smaller one when strictly smaller, set/clear `/DecodeParms`
-     (`Predictor 15, Colors 1, BPC 8, Columns width`) accordingly.
-4. Any `/Mask` present ⇒ `has_active_smask = True` (used to gate mask downsampling).
-5. Read `read_raw_bytes()`; abort if < 64 bytes.
-6. Detect `/DCTDecode` as a single name or a one-element array.
-
-#### 4.6.2 Mode A — Strict Lossless (`config.strict_lossless`)
-
-**Guarantee:** decoded pixels are bit-identical (`MSE == 0`).
-
-| Input | Action |
-| --- | --- |
-| Any `/DCTDecode` JPEG | `strip_jpeg_bloat_lossless`; write back only if smaller. DCT coefficients untouched. |
-| Non-JPEG, `PdfImage.mode` not in `{RGB, L, 1, P}` | **Return unchanged** (CMYK / ICCBased are preserved verbatim to avoid colour rounding). |
-| `1`-bit | Zopfli raw 1-bit buffer, rewrite as `/DeviceGray`, `BPC 1`. |
-| `P` (palette) | Convert to `RGB`, continue below. |
-| `L` | Candidates: raw Zopfli vs `Predictor 15` + Zopfli; rewrite `/DeviceGray`, `BPC 8`. |
-| `RGB` where `R == G == B` for every pixel | Take channel 0 → `/DeviceGray`, `BPC 8`, candidates as above. |
-| `RGB` with ≤ 256 unique colours | Frequency-sorted palette; 1 byte/pixel; `/Indexed /DeviceRGB hival <lookup>`; cost = deflate + palette bytes. |
-| Any other `RGB` | Raw Zopfli vs `Predictor 15` + Zopfli (stride `3*w`); rewrite `/DeviceRGB`, `BPC 8`. |
-
-`_apply_stream_update` writes the payload and normalises `/Width`, `/Height`, `/ColorSpace`,
-`/BitsPerComponent`, `/DecodeParms` (set or delete), and removes a stale `/Decode` array.
-
-#### 4.6.3 Mode B — Visually Lossless / Max Slim
-
-1. Decode with `pikepdf.PdfImage(...).as_pil_image()`; abort on failure.
-2. `1`-bit: same 1-bit Zopfli path as Mode A.
-3. Normalise: `P`, `CMYK`, and any other mode → `RGB`; a strictly grayscale `RGB` becomes `L`.
-4. **Downsampling** — only when `enable_downsampling` **and** `target_dpi < 600`:
-   - `eff_dpi` from the DPI map. If `None` and `max(w, h) > 1600`, use the heuristic
-     `eff_dpi = max(w, h) / 6.0`.
-   - If `eff_dpi > downsample_threshold_dpi`: `scale = target_dpi / eff_dpi`,
-     `new_w = max(16, round(w*scale))`, `new_h = max(16, round(h*scale))`; apply only when both
-     dimensions strictly shrink; resize with `LANCZOS` (3-lobe).
-   - If an active `/SMask` exists, re-render it, resize to the same dimensions with `LANCZOS`,
-     Zopfli-compress, rewrite as `/DeviceGray` `BPC 8`.
-5. **Classification** (`classify_pil_image`):
-   - mode `"1"` → `MONOCHROME`;
-   - thumbnail to ≤ 160×160 (`NEAREST`); if ≤ 256 distinct colours → `UI_GRAPHIC`;
-   - else compute the horizontal flat-run ratio on the thumbnail; `≥ 0.38` → `UI_GRAPHIC`,
-     otherwise `PHOTOGRAPH`.
-6. **Candidate generation** (cost = payload bytes, plus palette bytes where relevant):
-
-   | # | Condition | Encoding | Colour space |
-   | --- | --- | --- | --- |
-   | 1 | `UI_GRAPHIC` and `RGB` and `quantize_ui_screenshots` | `FASTOCTREE` quantize to `min(256, max(16, ui_palette_colors))`, no dither, palette trimmed to highest used index, `Predictor 15`+Zopfli or raw Zopfli | `/Indexed /DeviceRGB` |
-   | 2 | `PHOTOGRAPH` **or** no candidate yet | progressive JPEG, `optimize=True`, `subsampling="4:2:0"` for RGB else `0`, then JPEG bloat strip | `/DeviceRGB` or `/DeviceGray` |
-   | 3 | `width*height ≤ 1_500_000` | raw Zopfli vs `Predictor 15` + Zopfli | `/DeviceRGB` or `/DeviceGray` |
-
-7. Sort candidates by cost and apply the smallest **only if** `best_cost < orig_len`.
+Mode A adds one candidate the perceptual path does not need: `_exact_palette_candidate`, used only
+when `getcolors(maxcolors=257)` returns at most 256 colours, so the index map is exact and the decode
+is bit-identical. Without it, lossless mode quantised gradients (mean pixel difference 28.6); with
+it, gradients keep their stream untouched.
 
 **FR-IMG-1** Every image mutation MUST be gated by a strict decrease in encoded size.
 **FR-IMG-2** Mode A MUST NOT alter any pixel value.
 **FR-IMG-3** Mode B MUST re-encode `/SMask` consistently when the parent image is resized.
-**FR-IMG-4** Images whose decoded mode is unsupported in Mode A MUST be left untouched rather
-than colour-converted.
+**FR-IMG-4** Images whose decoded mode is unsupported in Mode A MUST be left untouched rather than
+colour-converted.
+**FR-IMG-5** A stream's `/ColorSpace` MUST be written as `pikepdf.Name`, never a Python `str`: a
+string becomes a PDF *string* and renders as a blank page. `/Indexed` is
+`Array([Name("/Indexed"), Name(base), hival, String(palette)])`.
 
 #### 4.6.4 `strip_jpeg_bloat_lossless`
 
 Walks JPEG markers from `SOI`:
 
-- Keeps `APP0` (JFIF), `APP2` (ICC_PROFILE), `APP14` (Adobe), and all tables
-  (`DQT`, `DHT`, `SOF*`, `DRI`, `SOS`).
-- Drops `COM` (`0xFE`), `APP1` (`0xE1`, EXIF/XMP), `APP3`–`APP13`, `APP15`.
-- Copies the whole entropy-coded scan from `SOS` to `EOI` verbatim.
-- Bails out and returns the original bytes on any structural anomaly, or when the result is not
-  strictly smaller.
+- Keeps `APP0` (JFIF), `APP2` (ICC_PROFILE), `APP14` (Adobe) and every table (`DQT`, `DHT`, `SOF*`,
+  `DRI`, `SOS`).
+- Drops `COM` (`0xFE`), `APP1` (`0xE1`, EXIF/XMP) and `APP3`–`APP13`, `APP15`.
+- Copies the entropy-coded scan from `SOS` to `EOI` verbatim.
+- Returns the original bytes on any structural anomaly, or when the result is not strictly smaller.
 
 #### 4.6.5 `zopfli_compress(data, iterations)`
 
-Returns the smaller of `zlib.compress(data, 9)` and `zopfli.zlib.compress(data, numiterations)`,
-falling back to plain zlib when Zopfli is missing, empty input, or on exception. Output is a
+Returns the smaller of `zlib.compress(data, 9)` and `zopfli.zlib.compress(data, iterations)`, falling
+back to plain zlib when Zopfli is missing, on empty input, or on an exception. Output is a
 zlib-wrapped deflate stream, i.e. `/FlateDecode` compatible.
 
 #### 4.6.6 `apply_png_predictor_15`
 
-Row-adaptive encoder producing `height` rows of `[filter_byte][stride bytes]`.
+Row-adaptive encoder producing `height` rows of `[filter_byte][stride bytes]` from **all five** PNG
+filters — None, Sub, Up, Average, Paeth — selected per row by the libpng heuristic (minimum sum of
+absolute signed residuals, `b if b < 128 else 256 - b`). `bpp` is 1 for Gray/Indexed and 3 for RGB.
+Round-trip and reference-value tests live in `tests/test_visually_lossless.py` (D-02).
 
-Implemented filters: `0` None, `1` Sub, `2` Up. Selection per row minimises the sum of absolute
-signed residuals (`b if b < 128 else 256 - b`). `bpp` is 1 for Gray/Indexed, 3 for RGB.
-`_paeth_predictor` exists but is **not used** (see `D-02`).
+Work is bounded so a pathological scan cannot stall a batch: the predictor loop is capped at 4 MP in
+Mode A, and candidate 3 is offered only at ≤ 1.5 MP.
 
-### 4.7 Stage 5 — Fonts and structural bloat
+### 4.7 Stage 5 — Fonts, structural bloat, streams
 
 #### 4.7.1 `optimize_fonts` (`engine/font_optimizer.py`)
 
 1. Collect referenced codes: start with `{0, 32}`, then for every `Tj`, `'`, `"` string add each
-   byte, and if the string length is even also add each big-endian 16-bit value; same for every
+   byte, and if the string length is even also add each big-endian 16-bit value; the same for every
    string inside a `TJ` array. Record `parsed_cleanly = False` if any page stream fails to parse.
-2. For each `/FontDescriptor` stream in `/FontFile|2|3`:
-   - Read raw and decoded bytes; skip empty.
-   - `/FontFile2` and `/FontFile3` are passed through `_subset_and_compact_sfnt`.
-   - Zopfli-compress the (possibly subsetted) decoded bytes.
-   - Write only if strictly smaller; for `/FontFile2` also update `/Length1` to the new decoded
-     length.
-3. For each `/Font` with a `/ToUnicode` stream: Zopfli recompress, write only if smaller.
-   (`bytes_saved` is credited; `font_streams_optimized` is not incremented for CMaps.)
+2. For each `/FontDescriptor` stream in `/FontFile|2|3`: read raw and decoded bytes, skip empty,
+   pass `/FontFile2` and `/FontFile3` through `_subset_and_compact_sfnt`, Zopfli-compress the result,
+   and write it only if strictly smaller (for `/FontFile2` also update `/Length1`).
+3. For each `/Font` with a `/ToUnicode` stream: Zopfli recompress and write only if smaller,
+   crediting `cmaps_optimized` (D-17).
 
 `_subset_and_compact_sfnt` uses `fontTools.subset` with:
 
@@ -640,68 +595,72 @@ signed residuals (`b if b < 128 else 256 - b`). `bpp` is 1 for Gray/Indexed, 3 f
 | `name_IDs` | `[1, 2, 6]` |
 | `name_legacy` | True |
 | `name_languages` | `[0x0409]` |
-| `drop_tables` | `DSIG, GPOS, GSUB, GDEF, kern, hdmx, VDMX, LTSH, PCLT, BASE, JSTF, MATH, SVG , CBDT, CBLC, COLR, CPAL, sbix` |
+| `drop_tables` | `DSIG, GPOS, GSUB, GDEF, kern, hdmx, VDMX, LTSH, PCLT, BASE, JSTF, MATH, SVG, CBDT, CBLC, COLR, CPAL, sbix` |
 
-Glyph selection: if streams parsed cleanly **and** codes exist **and** `num_glyphs > 64`, populate
-with `gids = used_codes ∩ [0, num_glyphs)` and `unicodes = used_codes`; otherwise populate **all**
-GIDs (tables are still stripped). Returns the original bytes when the result is not smaller or on
-any exception.
+Glyph selection: if the streams parsed cleanly **and** codes exist **and** `num_glyphs > 64`,
+populate with `gids = used_codes ∩ [0, num_glyphs)` and `unicodes = used_codes`; otherwise populate
+**all** GIDs (tables are still stripped). Return the original bytes when the result is not smaller or
+on any exception.
 
 **FR-FNT-1** `retain_gids=True` MUST remain set. Content streams reference glyph indices directly
-(`/CIDToGIDMap /Identity`), so dropping GIDs would corrupt text.
-
+(`/CIDToGIDMap /Identity`), so dropping GIDs corrupts text.
 **FR-FNT-2** When fontTools is unavailable the pass degrades to Zopfli-only recompression.
 
 #### 4.7.2 `strip_structural_bloat` (`engine/stream_optimizer.py`)
 
-With `strip_bloat`:
+With `strip_bloat`: delete `/Root /PieceInfo`, every page `/PieceInfo`, and `/PieceInfo` on any
+dictionary or stream; delete page `/Thumb` and credit its raw bytes.
 
-- Delete `/Root /PieceInfo`, every page `/PieceInfo`, and `/PieceInfo` on any dictionary/stream.
-- Delete page `/Thumb` (credit the raw bytes).
-
-With `strip_metadata`:
-
-- Delete `/Root /Metadata` (credit raw bytes).
-- Delete every key of `pdf.docinfo`.
+With `strip_metadata`: delete `/Root /Metadata` and every key of `pdf.docinfo`.
 
 Bookmarks (`/Outlines`), link annotations and AcroForm fields are never touched.
 
 #### 4.7.3 `recompress_content_streams`
 
-For every stream object:
+For every stream object: skip `/Subtype /Image` (Stage 4 owns it); skip any stream with
+`/DecodeParms` (predictor parameters would be invalidated); process only uncompressed or exactly
+`/FlateDecode` streams; skip decoded payloads under 32 bytes; Zopfli-compress and write only if
+strictly smaller.
 
-- skip `/Subtype /Image` (handled by Stage 4);
-- skip any stream with `/DecodeParms` (predictor/params would be invalidated);
-- process only uncompressed (`/Filter` absent) or exactly `/FlateDecode`;
-- skip decoded payloads < 32 bytes;
-- Zopfli-compress decoded bytes; write only if strictly smaller.
-
-This is the mechanism that shrinks page `/Contents`, Form XObjects and ICC profile streams
-without changing a single decoded byte of vector or text operators.
+This is what shrinks page `/Contents`, Form XObjects and ICC profiles without changing a single
+decoded byte of vector or text operators.
 
 ### 4.8 Never-grow guardrail
 
-**FR-GRD-1** After saving to the temp file, read `new_size`.
+**FR-GRD-1** After saving to the temp file, compare `new_size` with `orig_size`.
 
 **FR-GRD-2** Let `was_unlocked = was_encrypted or signatures_flattened > 0`.
 
-- If `new_size >= orig_size` **and not** `was_unlocked`: delete the temp file, copy the original
-  to `output_path` when the paths differ, and return a successful result with
+- If `new_size >= orig_size` **and not** `was_unlocked`: delete the temp file, copy the original to
+  `output_path` when the paths differ, and return a successful result with
   `compressed_bytes = original_bytes`, `after_breakdown = before_breakdown`,
   `kept_original_guardrail = True`.
-- Otherwise: audit the temp PDF, `os.replace` it onto `output_path`, and return
+- Otherwise audit the temp PDF, `os.replace` it onto `output_path`, and return
   `kept_original_guardrail = False`.
 
-**Rationale for the exception:** decrypting an encrypted document or removing signature byte-range
-locks necessarily changes the byte layout and can increase size; the user explicitly requested that
-transformation.
+**Rationale for the exception:** decrypting or removing signature locks necessarily changes the byte
+layout and can increase size; the user explicitly requested that transformation.
 
-**FR-GRD-3** The guardrail message must remain observable to the caller through
-`kept_original_guardrail` (JSON does not currently expose it — see `D-12`).
+**FR-GRD-3** The guardrail MUST stay observable: `kept_original_guardrail` and `already_optimal` are
+in the JSON, the row status, the results band, the inspector and a CLI summary line (D-12).
 
-### 4.9 Cleanup
+### 4.9 Stage 7 — Re-signing (`engine/signing.py`)
 
-A `finally` block deletes the temp file if it still exists, on both success and failure paths.
+Runs after the guardrail and before the atomic promote, only when `sign_after_slimming` is set.
+
+1. `SimpleSigner.load_pkcs12(path, passphrase)`; a wrong passphrase is a clean `SigningError`.
+2. `PdfSignatureMetadata(field_name=…, md_algorithm="sha256", reason=…, location=…)`, with
+   `HTTPTimeStamper` when `sign_tsa_url` is set.
+3. Sign a temp copy, verify that `/AcroForm /Fields` now contains the field, then `os.replace`.
+
+A failure leaves the input and the compressed output untouched: the run reports the error instead of
+producing an unsigned file that claimed to be signed.
+
+### 4.10 Cleanup
+
+A `finally` block deletes the temp file if it still exists, on both the success and the failure path.
+A hard kill therefore leaves no `.ozempdf_*.tmp.pdf` behind on the normal paths, and any leftover is
+ignored by discovery.
 
 ---
 
@@ -711,63 +670,59 @@ A `finally` block deletes the temp file if it still exists, on both success and 
 
 **FR-BAT-1** Inputs may be files or directories, in any mix.
 
-**FR-BAT-2** Files are accepted only when the suffix is `.pdf` (case-insensitive) and the name does
-not start with `.ozempdf_`. Results are de-duplicated by resolved absolute path, preserving the
-first occurrence order.
+**FR-BAT-2** A file is accepted only when its suffix is `.pdf` (case-insensitive) and its name does
+not start with `.ozempdf_`. Results are de-duplicated by resolved absolute path, preserving first
+occurrence order.
 
-**FR-BAT-3** Directories are walked recursively with `os.walk`; `dirs` and `files` are sorted so
-enumeration is deterministic. Files are returned as `(resolved_path, base_folder)` where
-`base_folder` is the directory that was passed in (used to mirror the tree).
+**FR-BAT-3** Directories are walked recursively; `dirs` and `files` are sorted so enumeration is
+deterministic. Results are `(resolved_path, base_folder)` where `base_folder` is the directory that
+was passed in, used to mirror the tree.
 
-**FR-BAT-4** During directory scans, files whose stem already ends with `exclude_suffix`
-(the configured output suffix) are skipped, so re-running a folder does not re-queue previous
-outputs. The filter applies to scans only, never to explicit files.
+**FR-BAT-4** During directory scans, files whose stem already ends with `exclude_suffix` (the
+configured output suffix) are skipped, so re-running a folder does not re-queue previous outputs. The
+filter applies to scans only, never to explicit files.
 
 ### 5.2 Path mapping and inspection
 
-- `resolve_output_path` — see [§3.8](#38-output-path-resolution).
+- `resolve_output_path` — see §3.8.
+- `_unique_outputs` — see §3.8 (collision suffixing).
 - `inspect_pdf_quick_metadata(path, password)` → `(page_count, size)`. On open failure returns
-  `(1, size)`; on stat failure `(0, 0)`.
-- `render_page_thumbnail_png(path, page_index=0, max_dimension=112)`:
-  `scale = clamp(max_dimension / max(page_w_pt, page_h_pt), 0.15, 2.0)`, render with pypdfium2,
-  encode PNG. Returns `None` on any failure. The GUI requests `max_dimension=110`.
+  `(1, size)`; on stat failure `(0, 0)`; on a permission error the item carries the actionable
+  message instead of failing the whole add.
+- `render_page_png(path, page_index, zoom_percent…)` — renders through pypdfium2 with the zoom
+  clamped so `longest_side * zoom ≤ 3400`, encodes PNG, and returns `None` on any failure. The
+  interface requests a thumbnail for the queue and a larger render for the inspector.
 
 ### 5.3 Execution (`run_batch_compression`)
 
 **FR-BAT-5** Build `(input, output, config)` tasks for every item before starting.
-
-**FR-BAT-6** `max_workers = config.max_workers or min(total, os.cpu_count() or 1)`.
-
-**FR-BAT-7** If `total == 1` or `max_workers <= 1`, run sequentially **in the calling process**;
-otherwise use `ProcessPoolExecutor`.
-
-**FR-BAT-8** Worker function `_worker_compress_task` MUST be module-level and picklable.
-
-**FR-BAT-9** Per-task exceptions become a failed `FileCompressionResult` carrying the original
-size; they never abort the batch.
-
-**FR-BAT-10** The progress callback is invoked as
-`progress_callback(completed_count, total_count, result)` exactly once per completed file, with
-`completed_count` running 1..N. Ordering of callbacks is completion order, not input order.
-
-**FR-BAT-11** `results` in the returned summary MUST be ordered by input index regardless of
-completion order.
-
+**FR-BAT-6** `workers = config.max_workers or min(total, os.cpu_count() or 1)`.
+**FR-BAT-7** If `total == 1` or `workers <= 1`, run sequentially in the calling process; otherwise use
+`ProcessPoolExecutor`.
+**FR-BAT-8** The worker function MUST be module-level and picklable.
+**FR-BAT-9** Per-task exceptions become a failed `FileCompressionResult` carrying the original size;
+they never abort the batch.
+**FR-BAT-10** The progress callback runs exactly once per completed file as
+`progress_callback(completed, total, result)`, in completion order.
+**FR-BAT-11** `results` MUST be ordered by input index regardless of completion order.
 **FR-BAT-12** An empty task list returns an empty summary with zero elapsed time.
+**FR-BAT-13** Dispatch is lazy, with `FIRST_COMPLETED`: tasks are submitted as slots free up, so a
+cancel prevents unstarted files from ever running.
 
 ### 5.4 Concurrency and cancellation
 
-- The GUI's `BatchCompressionWorker` raises `BatchCancelledError` from inside the progress callback
-  after emitting the finished file. That aborts dispatch of the remaining tasks.
-- Processes already running are **not** killable from the GUI; the stop takes effect at the next
-  file boundary. A single file inside Zopfli cannot be interrupted.
-- Files already completed keep their results; files whose status was `"processing"` are reset to
-  `"queued"` with `result = None`.
+- Cancellation is cooperative and takes effect at the next file boundary: work already in flight is
+  not killed, because a single file inside Zopfli cannot be interrupted safely.
+- Files already completed keep their results; a file whose status was `processing` returns to
+  `queued` with `result = None`.
+- The interface's Stop is the same contract as the CLI's interrupt: no partial output is promoted,
+  because promotion is the last step of a file.
 
 ### 5.5 Aggregation
 
 `BatchSummary` byte aggregates exclude failed files; a failure contributes to `failed_count` only.
-`aggregate_before_breakdown` / `aggregate_after_breakdown` sum successful results.
+`aggregate_before_breakdown` / `aggregate_after_breakdown` sum successful results, and
+`protection_removed_count` counts documents whose restrictions were removed.
 
 ---
 
@@ -776,54 +731,64 @@ completion order.
 ### 6.1 Invocation
 
 ```text
-ozempdf                                   # launch GUI
-ozempdf --gui a.pdf dir/                  # launch GUI pre-loaded
+ozempdf                                   # start the interface (browser)
+ozempdf --serve --port 8080 --no-browser  # serve the UI on a known port
 ozempdf a.pdf                             # Balanced on one file
 ozempdf dir/ -o out/ -w 8                 # recursive, custom folder, 8 workers
-ozempdf a.pdf --json-report -              # machine-readable stdout only
+ozempdf a.pdf --json-report -             # machine-readable stdout only
+ozempdf scan.pdf --flatten-signatures --sign-p12 me.p12 --sign-password env:P12
 ```
 
-`run_cli` pre-scans `--lang` (both `--lang X` and `--lang=X`) before building the parser so that
-`--help` and error text are localized.
+`run_cli` pre-scans `--lang` (both `--lang X` and `--lang=X`) before building the parser, so `--help`
+and error text are localized. A bare positional word `serve` is treated as `--serve` for muscle
+memory.
 
 ### 6.2 Options
 
 | Flag | Type | Default | Behaviour |
 | --- | --- | --- | --- |
-| `inputs` (positional) | paths | `[]` | files and/or folders; empty ⇒ GUI |
-| `--gui` | flag | off | force GUI, optionally pre-loading inputs |
-| `-p`, `--preset` | `lossless` / `balanced` / `max` | `balanced` | base config |
-| `--max-dpi` | int | preset | clamped 72–600; sets `enable_downsampling=True` and `strict_lossless=False` |
+| `inputs` (positional) | paths | `[]` | files and/or folders; empty ⇒ start the interface |
+| `--gui` | flag | off | alias for the interface path, optionally pre-loading inputs |
+| `--serve` | flag | off | serve the UI without the Electron shell |
+| `--port` | int | `0` (ephemeral) | loopback port for `--serve` |
+| `--no-browser` | flag | off | do not open a browser window |
+| `-p`, `--preset` | `lossless`/`balanced`/`max` | `balanced` | base configuration |
+| `--max-dpi` | int | preset | clamped 72–600; sets `enable_downsampling=True`, `strict_lossless=False` |
 | `--jpeg-quality` | int | preset | clamped 50–98; sets `strict_lossless=False` |
 | `--zopfli-iterations` | int | preset | clamped 5–50 |
 | `--no-subset-fonts` | flag | off | `subset_fonts=False` |
 | `--strip-metadata` | flag | off | `strip_metadata=True` |
-| `--no-unlock-signatures` | flag | off | `unlock_and_flatten_signatures=False` |
+| `--flatten-signatures` | flag | off | enables signature flattening (the UI asks for consent; the flag is that consent) |
 | `-o`, `--output-dir` | path | `None` | `CUSTOM_FOLDER`, resolved |
-| `--suffix` | str | `_compressed` | `SUFFIX`, empty falls back to `_compressed` |
+| `--suffix` | str | `_compressed` | `SUFFIX`; empty falls back to `_compressed` |
 | `--overwrite` | flag | off | `OVERWRITE`; takes precedence over `--output-dir` |
-| `-w`, `--workers` | int | `None` | `max_workers` |
-| `--password` | str | `""` | user open-password |
-| `--json-report` | path or `-` | `None` | write JSON report; `-` means stdout |
-| `--lang` | str | OS locale | sets locale before parsing |
-| `-v`, `--version` | flag | — | prints `OzemPDF v0.2.0` |
+| `-w`, `--workers` | int | auto | `max_workers` |
+| `--password` | str | `""` | caller-supplied open password |
+| `--json-report` | path or `-` | `None` | write the JSON report; `-` means stdout |
+| `--sign-p12` | path | `None` | re-sign the output with this PKCS#12 file |
+| `--sign-password` | str | `""` | PKCS#12 passphrase (never echoed or reported) |
+| `--sign-reason` | str | preset | `/Reason` of the new signature |
+| `--sign-tsa` | URL | `None` | RFC 3161 timestamp authority |
+| `--lang` | str | OS locale | sets the locale before parsing |
+| `--verbose` | flag | off | DEBUG logging with per-file timings |
+| `-h`, `--help` | flag | — | localized help |
+| `-v`, `--version` | flag | — | prints `OzemPDF v0.3.3` |
 
-**FR-CLI-1** `--max-dpi`, `--jpeg-quality` MUST clear `strict_lossless` (they are meaningless in
+**FR-CLI-1** `--max-dpi` and `--jpeg-quality` MUST clear `strict_lossless` (they are meaningless in
 Strict Lossless).
-
 **FR-CLI-2** When `--overwrite` and `--output-dir` are both given, `OVERWRITE` wins.
-
-**FR-CLI-3** With `--json-report -`, the human-readable per-file and summary lines are suppressed
-so stdout is pure JSON.
+**FR-CLI-3** With `--json-report -`, every human-readable line is suppressed so stdout is pure JSON.
+**FR-CLI-4** Signing flags without `--sign-p12` are ignored, and a signing failure fails the file
+rather than silently producing an unsigned output.
 
 ### 6.3 Exit codes
 
 | Code | Condition |
 | --- | --- |
-| `0` | all processed files succeeded, or the GUI returned 0 |
+| `0` | all processed files succeeded, or the interface returned 0 |
 | `1` | no PDF files discovered in the given paths |
 | `2` | at least one file failed |
-| GUI result | `run_cli` returns `launch_gui()`'s integer when delegating |
+| shell result | `run_cli` returns the interface process's integer when delegating |
 
 ### 6.4 Console output
 
@@ -839,35 +804,65 @@ Per file (failure, stderr):
 [i/N] ERR  broken.pdf: <error message>
 ```
 
-Summary block after the run:
+An unlocked document adds a line naming the protection that was removed. Summary block:
 
 ```text
 ------------------------------------------------------------------------
-OzemPDF v0.2.0 Batch Summary
+OzemPDF v0.3.3 Batch Summary
 Processed 3/3 files in 12.34s | 40.00 MB -> 6.00 MB | Saved 34.00 MB (-85.0%)
 Savings Breakdown: Images -30.00 MB | Fonts -1.20 MB | Vectors/Streams -2.10 MB | Metadata/Bloat -0.70 MB
 ```
 
-All lines are produced through `t(...)` keys `cli.*`. The `--help` strings, by contrast, are
-English literals inside `build_arg_parser` (see `D-11`).
+All of it is produced through `t(...)` keys under `cli.*`, help strings included (D-11): there are no
+English literals in the parser.
 
 ---
 
-## 7. Desktop GUI
+## 7. Web interface and desktop shell
 
-### 7.1 Launch and window
+The presentation layer is plain HTML, CSS and JavaScript served by the Python engine over a
+loopback HTTP server. There is no framework, no build step and no bundler: the files in
+`src/ozempdf/web/` are shipped verbatim and served as static assets. Two shells wrap the same UI:
 
-`launch_gui(initial_paths)`:
+| Shell | Entry point | Use |
+| --- | --- | --- |
+| Desktop app | `OzemPDF.exe` → `app/main.js` → spawns the frozen engine → loads its URL in Electron | Normal use on Windows, macOS, Linux |
+| Browser | `python -m ozempdf --serve` (or the packaged `Start OzemPDF in browser.cmd`) | Hosts that block the Electron sandbox; no Electron at all |
 
-1. `QApplication.setHighDpiScaleFactorRoundingPolicy(PassThrough)`.
-2. Create/reuse `QApplication`; `setApplicationName("OzemPDF")`.
-3. `install_bundled_fonts()`; base font `Inter` at 13 px, `Medium` weight.
-4. Show `OzemPDFMainWindow`; start the event loop.
+Because both shells talk to the same local API, there is exactly one implementation of every
+interaction and one set of tests (`tests/test_web.py`) covering them.
 
-Window: title `OzemPDF v<version>`, initial `1080 × 740`, minimum `912 × 620`
-(measured against Inter metrics for the Step 2 top bar). Accepts drops at window level.
+### 7.1 Startup handshake
 
-### 7.2 Three-step state machine
+`ozempdf.server.serve()` binds `127.0.0.1` on the requested port (default `0` = ephemeral), prints
+one line to stdout and then serves:
+
+```text
+OZEMPDF_READY {"port": 51234, "url": "http://127.0.0.1:51234/?token=…"}
+```
+
+`app/main.js` waits for that line, extracts the URL and calls `loadURL`. The token is also set as an
+`HttpOnly`-equivalent session cookie (`ozempdf_token`) by the first navigation, so the page can call
+the API without embedding the secret in every request. A ready line that never arrives is a startup
+failure and is reported in `data/main.log`.
+
+### 7.2 Local server security model
+
+The server is a local API, not a public one, and is treated as an attack surface:
+
+| Control | Implementation |
+| --- | --- |
+| Binding | `127.0.0.1` only; never `0.0.0.0` |
+| Authentication | Random per-session token, accepted from the `X-OzemPDF-Token` header or the `ozempdf_token` cookie; every `/api/*` route except `/api/bootstrap` requires it |
+| Cross-origin writes | `Origin` is validated on every `POST`/`PUT`; a foreign origin is rejected with 403 |
+| Content injection | `Content-Security-Policy: default-src 'self'`, no inline script, no remote fonts or images |
+| Path traversal | `/api/fs/list`, `/api/upload` and static serving resolve and confine paths; `..` is rejected |
+| Long-running work | One batch at a time; `/api/run/stop` is idempotent |
+
+The server never opens an outbound socket, so the "works offline" promise (US-049) is a property of
+the process, not a policy.
+
+### 7.3 Three-step state machine
 
 ```mermaid
 stateDiagram-v2
@@ -884,253 +879,254 @@ stateDiagram-v2
     Step3 --> Step1: queue emptied / cleared
 ```
 
-Transition table:
-
 | Trigger | Guard | Effect |
 | --- | --- | --- |
-| Add paths (Step 1) | new files discovered | append rows, `_set_step(2)` |
+| Add paths (Step 1) | new files discovered | append rows, move to Step 2 |
 | Add paths (Step 2) | new files discovered | append rows, stay |
 | Add paths (Step 3) | any row `done` | append rows with status `new_queued`, stay |
-| Stepper click 2 | queue non-empty and not processing | `_set_step(2)` |
-| Stepper click 3 | any row `done` and not processing | `_set_step(3)` |
-| Batch complete, 0 failures | — | `_set_step(3)`, selection reset to aggregate |
-| Batch complete, ≥1 failure | — | stay on the current step and refresh (rows show Retry) |
-| Stop requested | — | `processing` rows → `queued`, stay on current step |
-| Remove last row / Clear All | not processing | `_set_step(1)`, footer hidden |
+| Stepper click 2 | queue non-empty and not processing | show Step 2 |
+| Stepper click 3 | any row `done` and not processing | show Step 3 |
+| Batch complete, 0 failures | — | Step 3, breakdown selection reset to the aggregate |
+| Batch complete, ≥1 failure | — | stay on the current step, refresh rows (failed rows offer Retry) |
+| Stop requested | — | `processing` rows → `queued`, stay on the current step |
+| Remove last row / Clear All | not processing | Step 1, dock hidden |
 
-Stepper buttons are disabled when their destination is empty (step 2 needs a queue, step 3 needs a
-completed file) or while a batch runs. The connector lines turn success-coloured once passed.
+Step buttons are disabled when their destination would be empty, or while a run is active. The
+active step is marked with `aria-current="step"`; a completed step keeps a success-coloured tick.
 
-### 7.3 Layout: header
+### 7.4 Header
 
-`QFrame#HeaderBar`, fixed height 58 px, three zones:
+`<header class="app-header">`, one row, three zones:
 
-- **Brand**: 32 px rounded accent tile holding the `brand` icon, `OzemPDF` in Inter Black 16 px with
-  0.3 px tracking, and a monospace version badge.
-- **Stepper** (`QFrame#StepperContainer`): three flat pill buttons `1. Add PDFs`,
-  `2. Configure & Queue`, `3. Slimmed Results`, separated by 18×2 px lines. Active step is a
-  surface pill with a strong border; completed steps are success-coloured text.
-- **Controls**: a language button (menu of available catalogs, label = current code uppercased) and
-  a theme button whose label names the mode that clicking **will produce**.
+- **Brand** — a 32 px accent tile with the document mark, the wordmark, and a version chip. The chip
+  is rendered from `state.version` (`v0.3.3`) by `applyI18n()`, never hardcoded; a test asserts the
+  static fallback in `index.html` matches `_version.py`.
+- **Stepper** — three buttons (`1. Add PDFs`, `2. Configure & Queue`, `3. Slimmed Results`) with
+  connector rules. The active step gets an accent underline and an accent badge; passed steps get a
+  success tick.
+- **Controls** — language (`select`, built from `/api/bootstrap`'s catalog list), theme toggle
+  (light/dark, following the OS preference on first run) and Help.
 
-### 7.4 Step 1 — Add PDFs
+### 7.5 Step 1 — Add PDFs
 
-Only the hero drop zone is rendered: a 72×72 accent-tinted icon tile, a 20 px ExtraBold headline,
-a wrapped 13 px subtitle capped at 500 px, and the primary `Select PDF Files` plus secondary
-`Select Folder` buttons. No presets, no queue, no footer. Rationale: progressive disclosure —
-no compression knobs before there is something to compress.
+Only the hero drop mat is shown: an accent-tinted 72 px icon tile, a headline, a wrapped subtitle
+capped at 500 px, and the primary `Select PDF files` plus secondary `Select folder` buttons. No
+presets, no queue, no dock — progressive disclosure: no compression knobs before there is something
+to compress.
 
-### 7.5 Step 2 — Configure and queue
+Dropping something that is not a PDF produces one notice naming what was ignored and why (US-004);
+`/api/queue/add` returns `skipped[]` with a localized reason per entry, including duplicates.
 
-Vertical order (top to bottom):
+### 7.6 Step 2 — Configure and queue
 
-1. **Queue top bar** — heading `Queued Documents (N)`, summary `• P pages • S total`, and buttons
-   `Add More PDFs`, `Add Folder`, `Clear All`.
-2. **Queue card** (`QFrame#QueueCard`, drop target) — sticky 32 px header row, then a
-   `QScrollArea` of rows. Card height cap: `2 + 32 + min(rows, 5) * 60`, so at most five rows are
-   visible before the list scrolls. Column minimum widths (shared by header and rows):
-   Document stretch, Pages 64, Original 92, Status 150, Savings 82, Action 104.
-3. **Compression Mode card** (`QFrame#SurfaceCard`) — title, active-preset description, the
-   three-pill segmented control, `Reset to Preset Defaults`, and `Advanced` toggle, followed by the
-   collapsible drawer.
-4. **Footer dock** — see [§7.8](#78-footer-dock).
+Top to bottom: the queue panel, the compression-mode card, the advanced drawer, and the footer dock.
 
-Row widget (`FileQueueRowWidget`, fixed 60 px):
+Queue table columns (shared header and rows, CSS grid so translations can widen cells):
 
 | Column | Content |
 | --- | --- |
-| Document | 34×44 thumbnail button (page 1 or vector placeholder) + name (bold 12 px, elided) + relative path (monospace 10 px, elided); tooltips carry full path/name |
+| Document | 34×44 thumbnail (page 1, rendered by `/api/thumb`) + name (bold, ellipsized) + relative path (monospace, ellipsized); `title` carries the full path |
 | Pages | `Np`, or `…` until inspection completes |
 | Original | `format_bytes`, or `…` |
-| Status | `Slimmed = <size>` in success colour; `● New — Queued`; `Slimming…` plus a 4 px indeterminate bar; `Error: <elided>` with full-message tooltip; `● Queued — Ready to Slim` |
+| Status | `Slimmed = <size>` (success); `● New — Queued`; `Slimming…` with an indeterminate bar; `Error: <message>` (danger, full message in `title`); a lock or open-lock badge for protected documents; `Open password required` for a password-locked file |
 | Savings | `-P%` success pill; `Pending`; `Failed` danger pill; `—` |
 | Action | `Inspect` (done), `Retry` + `Remove` (error), `Remove` (queued), nothing (processing) |
 
-Rows elide name and path against the live document-column width on `resizeEvent`/`showEvent`.
-Clicking a row in Step 3 toggles aggregate ↔ single-file breakdown.
+Below 700 px the table becomes two-line records (document + savings on the first line, pages,
+original and action on the second) so nothing is clipped. Rows are reachable by keyboard, and the
+row button opens the inspector.
 
-### 7.6 Compression mode card and advanced drawer
+### 7.7 Compression mode card and advanced drawer
 
-Segmented pills: `Strict Lossless`, `Visually Lossless`, `Max Slim`. Selecting one replaces the
-whole config via `from_preset` while preserving output mode, suffix and directory.
+The segmented control offers `Strict Lossless`, `Visually Lossless` and `Max Slim`. Selecting one
+replaces the whole configuration through `POST /api/preset` while preserving the output mode, suffix
+and directory — the same contract the CLI has.
 
-The drawer animates `maximumHeight` from 0 to `layout().activate(); sizeHint().height()` over
-260 ms with `OutCubic`, or 0 ms when reduced motion is requested. Three equal-width sub-cards:
+`Advanced` reveals three fieldset cards, laid out as three equal columns on wide screens and one
+column below 1080 px:
 
 | Card | Controls |
 | --- | --- |
-| 1. Raster Images | DPI slider 72–300 (`> round(dpi*1.45) DPI` trigger shown), JPEG slider 50–95, `Screenshots → palette` checkbox |
-| 2. Stream & Deflate Engine | Zopfli slider 5–50 passes, `Strip redundant /SMask`, `Deduplicate images & ICCs`, `Pack 1.5+ object streams` |
-| 3. Fonts, Metadata & Locks | `Subset embedded fonts`, `Strip app bloat`, `Flatten locks & signatures`, `Strip XMP & Doc Info` |
+| Raster images | Target DPI slider 72–600 (with the live `downsample above N DPI` threshold), JPEG quality 50–98, `Screenshots → palette`, palette size 64–256 |
+| Stream & deflate engine | Zopfli passes 5–50, strip opaque `/SMask`, deduplicate images and ICC profiles, object streams |
+| Fonts, metadata & locks | Subset fonts, strip app bloat, flatten locks and signatures, strip XMP and document info, and the re-signing block (PKCS#12 file, password, field name, reason, location, TSA URL) |
 
-Every label is word-wrapped and every knob has a tooltip. Any change sets `preset = CUSTOM`,
-`strict_lossless = False`, and recomputes `downsample_threshold_dpi`.
+Every control has a tooltip and an accessible label. Any knob edit sets `preset = CUSTOM` and
+`strict_lossless = false`; the change is debounced into `POST /api/config`, which clamps and echoes
+the canonical value, so the UI never holds an out-of-range number.
 
-### 7.7 Step 3 — Slimmed results
+Two edits require consent first, because they change what the document legally is: flattening
+signatures and re-signing. Each opens a dialog that states the consequence; cancelling reverts the
+checkbox.
 
-- **Savings banner** (`QFrame#SavingsBanner`) appears when at least one file is done. Title and
-  subtitle come from `step3.banner_title*`/`banner_subtitle*`; the icon and colour switch from
-  success to warning when `_last_summary.failed_count > 0`.
-- **Queue card** relisted as `Processed Documents (N)`, or
-  `Batch Queue (D Slimmed, P New Pending)` when new files were added.
-- **Breakdown card** (`SavingsBreakdownWidget`) defaults to the **aggregate across all completed
-  files** with badge `All N Completed Files (orig → slim)`; clicking a completed row switches to
-  `name (orig → slim)` and shows a `Show Total` affordance; clicking the selected row again
-  returns to the aggregate.
-- **Footer dock** swaps to `Start New Batch` + `Open Output` when nothing is pending; with pending
-  files it keeps the output selector and changes the CTA to `Slim N New PDFs (size)`.
+### 7.8 Step 3 — Slimmed results
 
-Each of the four category sub-cards shows a label, `-P%`, a monospace `before → after` line, and an
-8 px animated bar whose fill equals the **fraction of that category removed**
-(`(b-a)/b`, clamped to ≥ 0.04). The fill is animated via a `Property(float)` over 360 ms unless
-reduced motion is requested.
+- **Results band** — the headline percentage, the byte totals and a note. The note switches between
+  success and warning styling when any file failed, reports "already as small as it gets" files,
+  and counts unlocked documents (`band_notes_unlocked_one` / `_many`).
+- **Processed list** — the same table relisted as `Processed Documents (N)`, or
+  `Batch Queue (D slimmed, P new pending)` when files were added after the run.
+- **Breakdown** — four category rows (images, fonts, vectors/streams, metadata/bloat), each with a
+  label, `-P%`, a monospace `before → after` line and a bar whose fill is the fraction of that
+  category removed. The card defaults to the **aggregate across all completed files**; clicking a
+  completed row switches to that file and offers `Show total`; clicking the selected row returns to
+  the aggregate.
+- **Dock** — swaps the primary action to `Start new batch` and shows `Open output` when nothing is
+  pending; with pending files it keeps the destination selector and offers `Slim N new PDFs (size)`.
 
-### 7.8 Footer dock
+### 7.9 Footer dock
 
-`QFrame#FooterDock`, fixed 62 px, left→right:
+Fixed to the bottom of the step area:
 
-- Output group: `Save Output To:` label, the custom upward popover trigger, a 108 px suffix
-  `QLineEdit` and a `.pdf` caption (suffix widgets visible only in `SUFFIX` mode).
-- Step 3 group: `Start New Batch`.
-- Stretch.
-- `Open Output`, `Stop` (visible only while processing), and the primary CTA.
+- Output group — `Save output to:` trigger, a suffix field (only in suffix mode) and a `.pdf`
+  caption.
+- Step 3 group — `Start new batch`.
+- Spacer.
+- `Open output`, `Stop` (only while running) and the primary action.
 
-Output popover (`OutputPopoverPopup`, a `Qt.Popup` frame 340 px wide, positioned above the
-trigger): three option cards with vector icon tiles — `Same folder with suffix`,
-`Custom output folder…` (opens a directory picker immediately when no folder is set), and
-`Overwrite original files` with an `Atomic` badge. Selecting *Overwrite* later requires a
-confirmation dialog whose default button is **No**.
+The destination dialog is a native `<dialog>` with three option cards: *Same folder with suffix*,
+*Custom output folder…* (opens the folder picker immediately when empty) and *Overwrite original
+files*, which carries an `Atomic` badge and requires a confirmation whose default button is **No**.
 
-Primary CTA labels:
+Primary action labels: `Slim 1 PDF (size)`, `Slim N PDFs (size)`, `Slimming (done/total)…`
+(disabled), `Slim 1 new PDF (size)`, `Slim N new PDFs (size)`.
 
-| State | Text |
-| --- | --- |
-| Step 2, single pending | `Slim 1 PDF (size)` |
-| Step 2, several | `Slim N PDFs (size)` |
-| Running | `Slimming (done/total)…` (disabled) |
-| Step 3 with 1 new | `Slim 1 New PDF (size)` |
-| Step 3 with N new | `Slim N New PDFs (size)` |
+### 7.10 Quality inspector
 
-### 7.9 Quality Inspector dialog
+`<dialog class="inspector">`, opened per row. The toolbar carries a `Wipe-slider inspector` badge,
+the file name and a subtitle (`compare` when a slimmed file exists, otherwise `preview only` with the
+wipe disabled), page navigation, four zoom pills (`100 %`, `200 %`, `400 %`, `800 %`, default
+`200`), `Reset` and close.
 
-`PreviewInspectorDialog`, modal, `940 × 640` (minimum `720 × 480`).
+The canvas paints the slimmed page on the right and the original on the left, clipped at
+`wipe_x = width * ratio` with `ratio ∈ [0.02, 0.98]` (default `0.5`). A 2 px accent divider and a
+draggable handle sit on the seam; corner badges read `ORIGINAL (size)` and
+`SLIMMED (size • -pct% • vectors 100% crisp)`, or `PREVIEW (…)` when no output exists yet.
 
-Toolbar: badge `Wipe-Slider Inspector`, wrapping file name and subtitle (`compare` when a slimmed
-file exists, otherwise `preview only` and the wipe is disabled), `Page` caption, prev/next chevron
-buttons, a `Page k / N` spin box, four zoom pills (`100 %`, `200 %`, `400 %`, `800 %`; default
-`200`), `Reset`, and a close button.
+Interaction: dragging near the divider wipes, dragging elsewhere pans, the wheel zooms, and the keys
+`←`/`→` step pages, `+`/`=`/`-` zoom and `R` resets. Pages are rendered by `/api/page` with
+`scale = clamp(1.15 * (zoom/200), 0.5, 3400/longest_side)` so a huge page cannot stall the dialog.
+The footer holds the wipe slider (2–98), the percentage readout, a pan hint, `Open file` and `Done`.
 
-Canvas (`WipeCompareCanvas`, minimum 420×300):
+### 7.11 Drag and drop
 
-- Backdrop follows the palette; the page is drawn with a drop shadow over white paper.
-- Right half paints the slimmed page, left half the original, clipped at `wipe_x = width * ratio`
-  (`ratio ∈ [0.02, 0.98]`, default `0.5`).
-- A 2.5 px accent divider plus a 20 px radius draggable handle painted with two chevrons.
-- Corner badges: `ORIGINAL (size)` top-left; `SLIMMED (size • -pct% • Vectors 100% Crisp)`
-  top-right, or `PREVIEW (...)` when no output exists.
-- Drag near the divider ⇒ wipe; drag elsewhere ⇒ pan. Wheel ⇒ zoom step. Keys: `←`/`→` page,
-  `+`/`=`/`-` zoom, `R` reset.
-- Rendering: `scale = clamp(1.15 * (zoom/200), 0.5, 3400/max_page_pt)`; the bitmap is capped so a
-  huge page cannot stall the dialog. At 800 % the canvas additionally scales the bitmap by 1.6 for
-  legibility.
-- Footer: `Original`, wipe `QSlider` 2–98 (180 px), `Slimmed`, percentage readout, pan hint,
-  `Open File` (system viewer), `Done`.
+The drop mat, the queue panel and the window are all drop targets; dragging over any of them lights
+up the shared `dragActive` state. In the desktop shell the dropped path comes from Electron's
+`webUtils.getPathForFile`; in a browser, where a real path cannot be revealed, the file is staged
+through `/api/upload` and compressed from that copy, so the browser build never silently loses files.
 
-### 7.10 Drag and drop
-
-Window-level `dragEnterEvent` accepts any URL list and lights up **all** drop targets
-(`hero_drop_card`, `table_card`, `rows_container`) through the `dragActive` property.
-`dragLeaveEvent` clears the feedback. `dropEvent` clears feedback, converts local URLs to paths
-and calls `add_paths_to_queue`.
-
-### 7.11 Keyboard shortcuts
+### 7.12 Keyboard shortcuts
 
 | Shortcut | Action | Guard |
 | --- | --- | --- |
-| `Ctrl+O` | Select PDF files | not processing |
-| `Ctrl+Shift+F` | Select folder | not processing |
-| `Return` / keypad `Enter` | Start batch | focus not in a `QLineEdit` |
-| `Ctrl+I` | Inspect first completed file | — |
-| `←` / `→` | Inspector page step | inspector focused |
-| `+` / `=` / `-` | Inspector zoom step | inspector focused |
-| `R` | Inspector reset view | inspector focused |
+| `Ctrl/Cmd+O` | Select PDF files | not processing |
+| `Ctrl/Cmd+Shift+O` | Select folder | not processing |
+| `Enter` | Start the batch | focus not in a field or on a button |
+| `Ctrl/Cmd+I` | Inspect the first completed file | — |
+| `←` / `→` | Inspector page step | inspector open |
+| `+` / `=` / `-` | Inspector zoom step | inspector open |
+| `R` | Inspector reset | inspector open |
+| `Esc` | Close the topmost dialog | — |
 
-`Help → About` and `Help → Keyboard Shortcuts` open message boxes; both strings are localized.
+Every control is a real `<button>` or `<input>`, so focus order, `Tab`, `Space` and screen readers
+work without a custom key handler. The help dialog lists the same table.
 
-### 7.12 Settings persistence
+### 7.13 Settings persistence
 
-- Location: `QStandardPaths.AppConfigLocation / "OzemPDF" / "settings.json"`
-  (fallback `~/.config/OzemPDF` when the base path has no parent).
-- Write: JSON to `settings.json.tmp` then `Path.replace` (atomic); failure is non-fatal.
-- Read: corrupt or missing file ⇒ `{}`.
-- Persisted today: `dark_mode`, `preset`, `advanced_open`, and the advanced knob subset plus output
-  destination under `config`.
-- **Not** persisted today: the language code. `_choose_language` calls `_persist_settings()`, but
-  that payload omits `language`, and nothing restores it at launch, so the OS locale wins on every
-  start (`D-07`, `D-21`).
-- Restored config is rebuilt from the preset first, then overlaid with stored values whose keys
-  exist on the dataclass; invalid enum strings are ignored.
-- Theme on first run follows the OS colour scheme (`styleHints().colorScheme()`), not a hard-coded
-  default.
+- Location: `data/settings.json` beside the executable for packaged builds (see
+  [§13.3](#133-standalone-builds)); `%APPDATA%/OzemPDF` or `~/.config/OzemPDF` for a source install;
+  `app/.dev-data` for the dev checkout. `OZEMPDF_DATA_DIR` overrides all of it.
+- Write: JSON to `settings.json.tmp`, then `os.replace`; failure is non-fatal.
+- Read: a corrupt or missing file yields `{}`.
+- Persisted: `dark_mode`, `language`, `preset`, `advanced_open`, and the advanced knob subset plus
+  the output destination under `config`. Passwords (open password, PKCS#12 password) are never
+  persisted — `PERSISTED_KEYS` excludes them and a test asserts it.
+- Restored configuration is rebuilt from the preset first, then overlaid with stored values whose
+  keys exist on the dataclass; invalid enum strings are ignored.
+- Theme on first run follows `prefers-color-scheme`.
 
-### 7.13 Theme engine
+### 7.14 Theme engine
 
-`ThemePalette` is a frozen slots dataclass with 22 colour tokens plus `is_dark`:
-`bg_app`, `bg_surface`, `bg_elevated`, `bg_card`, `bg_hover`, `bg_selected`, `border`,
-`border_strong`, `text_primary`, `text_secondary`, `text_muted`, `accent`, `accent_hover`,
-`accent_soft`, `success`, `success_soft`, `warning`, `warning_soft`, `danger`, `danger_soft`,
-`scrollbar_thumb`, `scrollbar_thumb_hover`.
+Themes are CSS custom properties on `:root` and `[data-theme="dark"]` in `styles.css`; there is no
+stylesheet generator and no per-widget recolouring. The token set covers surfaces (`--bg`,
+`--surface`, `--raised`, `--raised-2`), lines (`--line`, `--line-strong`), text (`--ink`, `--ink-2`,
+`--ink-3`), the accent (`--accent`, `--accent-hover`, `--accent-ink`, `--accent-soft`) and the
+semantic pairs (`--success`, `--warning`, `--danger`, each with a soft tint).
 
-Two literal palettes (`DARK_PALETTE`, `LIGHT_PALETTE`) and one QSS generator
-(`build_stylesheet(dark_mode)`). The stylesheet is applied **both** to the main window and to the
-`QApplication`, because dialogs, popovers, menus and file pickers are outside the window's
-stylesheet scope. Muted text is chosen for WCAG AA at 10–11 px (`#8FA0B8` ≈ 6.7:1 on
-`#111827`; `#475569` ≈ 8.1:1 on white).
+The accent is **ink blue**: `#1b4a80` light / `#63b3ed` dark. Green, amber and red keep their
+semantic meaning for savings, partial runs and errors, so nothing that communicates state is
+decorative. Measured contrast (WCAG): accent on surface 8.6:1 light / 7.8:1 dark; white on accent
+9.0:1; accent on its soft tint 7.6:1 light / 6.3:1 dark; body text 16.5:1 / 14.9:1. `DESIGN.md`
+carries the full table.
 
-Theming also re-tints every vector icon, the inspector canvas, the breakdown bars, the programmer
-monospace readouts, and the window icon.
+Theme switching is a `data-theme` attribute on `<html>`; the choice is stored and applied before
+first paint to avoid a flash.
 
-### 7.14 Icons and typography
+### 7.15 Typography and icons
 
-- `gui/icons.py` defines **37** hand-authored stroke glyphs on a 24×24 viewBox, rendered by
-  `QSvgRenderer` into pixmaps at 1× and 2× for 16/20/24 px QIcons. Emoji is never used as UI icon
-  language. `play` is the only filled glyph (`__FILL__` substitution).
-- `gui/fonts.py` registers nine bundled OFL faces: Inter Regular/Medium/SemiBold/Bold/ExtraBold/
-  Italic and JetBrains Mono Regular/Medium/Bold. Registration is idempotent and skips missing
-  files. Font directory resolution honours `sys._MEIPASS`.
-- Real tracking is applied through `QFont.setLetterSpacing` (QSS `letter-spacing` is ignored by
-  Qt), via `tracked_font(px, weight, spacing_px)`.
+- IBM Plex Sans (latin + latin-ext `woff2`) for prose and controls, JetBrains Mono for every
+  measurement, path and size. Both are bundled under `web/fonts/` with their OFL texts, declared as
+  package data and copied into the frozen engine, so a packaged build never falls back to system
+  fonts.
+- One inline SVG sprite (`<symbol>` per glyph) referenced with `<use href="#i-…">`, so icons inherit
+  `currentColor` and the theme automatically. No emoji, no icon font, no per-theme icon files.
 
-### 7.15 Threading
+### 7.16 Threading
 
-| Thread | Class | Signals | Purpose |
-| --- | --- | --- | --- |
-| `ThumbnailLoaderThread` | `QThread` | `item_inspected(path:str, pages:int, size:int, png:bytes)` | page count + page-1 thumbnail, sequential |
-| `BatchCompressionWorker` | `QThread` | `file_completed(done, total, result)`, `batch_completed(summary)`, `batch_cancelled()` | drives `run_batch_compression`, emits per file |
+| Work | Where it runs | Why |
+| --- | --- | --- |
+| HTTP requests | `ThreadingHTTPServer` request threads | a slow request must not block the UI or a batch |
+| Batch compression | one dedicated run thread per `/api/run/start`, which dispatches files to a `ProcessPoolExecutor` | the UI keeps answering `/api/run` polls while files compress |
+| Thumbnails and page renders | `ThreadPoolExecutor(2)` in `AppState` | bounded parallel rendering without competing with the batch |
+| Compression itself | worker processes, one file each | CPU-bound; the GIL would serialize threads |
 
-Rules:
+The UI never blocks on a compression call: it polls `/api/run`, which returns the live queue,
+progress and results. Closing the window mid-run is guarded (US-053): the shell asks, then stops at a
+file boundary and waits for the in-flight file before quitting.
 
-- A new thumbnail load cancels and joins the previous thread (`cancel()`, `wait(300)`).
-- `closeEvent` cancels and joins the thumbnail thread (`wait(500)`), then waits up to 1000 ms for
-  the batch thread. The batch is **not** cancelled on close.
-- The GUI never calls the compression engine on the UI thread.
+### 7.17 Reduced motion
 
-### 7.16 Reduced motion
+`@media (prefers-reduced-motion: reduce)` disables the drawer reveal, breakdown-bar growth, toast
+slides and inspector transitions. No JavaScript switch is needed, and no animation is load-bearing —
+the reduced-motion path reaches the same states.
 
-`OZEMPDF_REDUCED_MOTION` (truthy: `1`, `true`, `yes`, `on`) disables drawer and breakdown-bar
-animation by setting duration 0. `main_window._prefers_reduced_motion` additionally probes
-`styleHints().businessProperties()` and accepts `REDUCE_MOTION`; the Qt probe targets an API that
-`QStyleHints` does not expose, so in practice the environment variables are the effective switch
-(`D-13`).
+### 7.18 Live retranslation
 
-### 7.17 Live retranslation
+`POST /api/ui` sets the language, persists it, and returns the full flattened catalog plus the
+resolved language. The client re-renders every `data-i18n` node and every string it built in
+JavaScript, so switching language does not reload the page or lose queue state. `document.documentElement.lang`
+and `document.title` are updated too. The catalog list in the language `select` comes from
+`available_languages()`, so dropping a new JSON file in `locales/` is the whole integration cost.
 
-`register_language_listener(self._on_language_changed)` is installed at construction.
-`_on_language_changed` re-renders the window title, header, Step 1 copy, workspace copy
-(presets, advanced labels, column headers, queue buttons, output label, breakdown card),
-footer, and workspace state. The menu check marks are repopulated from `available_languages()`.
-The choice is **not** currently written to or restored from the settings file (`D-21`); the
-catalog reselected at launch is the OS locale (or `OZEMPDF_LANG`).
+### 7.19 Desktop shell (Electron)
+
+`app/main.js`:
+
+1. Resolves the engine: `resources/engine/ozempdf-engine/ozempdf-engine.exe` in a packaged build,
+   `python -m ozempdf` in a checkout.
+2. Points `userData`, `sessionData`, `crashDumps` and `TEMP`/`TMP`/`TMPDIR` at `data/` beside the
+   executable, and passes `OZEMPDF_DATA_DIR` to the engine, so a portable copy writes nothing to
+   `%APPDATA%` or the system temp directory.
+3. Spawns the engine with `--serve --port 0 --no-browser`, waits for `OZEMPDF_READY`, then loads the
+   URL. Startup, engine exit and renderer failures are appended to `data/main.log`.
+4. Exposes only four capabilities through `app/preload.js` with `contextIsolation`: `pickPaths`,
+   `openPath`, `showItemInFolder`, `getPathForFile`. There is no `nodeIntegration`, and the renderer
+   cannot read arbitrary files.
+5. Intercepts `close` while a run is active, calls `window.__ozemCloseGuard()`, shows a native
+   dialog, then `__ozemStopAndWait()` before quitting.
+
+Electron is pinned to the **38.x** line: 45's Chromium sandbox aborts before `main.js` runs on the
+reference Windows 11 host. The compatibility launcher (`--no-sandbox`) exists for hosts that still
+block the sandbox; it is a host workaround, never the default.
+
+### 7.20 Browser fallback
+
+`python -m ozempdf --serve` prints the URL, opens the default browser unless `--no-browser` is given,
+and serves the identical UI. Differences are deliberate and documented: a browser cannot reveal a
+real file path, so drops are staged through `/api/upload`; `Open output` and `Show in folder` are
+served by `/api/open`; the close guard uses `beforeunload`. Everything else — presets, drawer,
+results, inspector, signing — behaves identically, which is what makes the browser build a real
+fallback rather than a demo.
 
 ---
 
@@ -1138,39 +1134,47 @@ catalog reselected at launch is the OS locale (or `OZEMPDF_LANG`).
 
 ### 8.1 Catalog format
 
-UTF-8 JSON, one file per locale: `src/ozempdf/locales/<code>.json`.
+UTF-8 JSON, one file per locale: `src/ozempdf/locales/<code>.json`. 19 top-level groups, 282 leaf
+strings at 0.3.3 (Appendix C).
 
 - Reserved `_meta` object: `code`, `name`, `native_name`.
 - Arbitrary nesting; lookups use dot paths (`step3.cat_images`).
 - Values are strings; placeholders use `str.format` syntax (`{count}`, `{size}`).
-- Fallback catalog is always `en.json`.
+- The fallback catalog is always `en.json`.
 
 ### 8.2 Resolution algorithm
 
 `t(key, **kwargs)`:
 
-1. Resolve the dotted path in the active catalog; if absent, resolve in the English fallback;
-   if still absent, use the raw key.
+1. Resolve the dotted path in the active catalog; if absent, resolve in the English fallback; if
+   still absent, return the raw key.
 2. If kwargs are given, `template.format(**kwargs)`; on `KeyError`, `ValueError` or `IndexError`
-   return the unformatted template (never raise into UI code).
+   return the unformatted template — never raise into UI or CLI code.
 
 ### 8.3 Language selection
 
-Precedence: `OZEMPDF_LANG` → `locale.getlocale()` → `en`. A full code (`pt_BR`) is tried, then its
-short form (`pt`). Only catalogs that actually exist are selected. `set_language` returns `False`
-for unknown codes and leaves the current language unchanged.
+Precedence: an explicit choice (a `--lang` flag or a stored preference restored at startup) →
+`OZEMPDF_LANG` → `locale.getlocale()` → `en`. A full code (`pt_BR`) is tried, then its short form
+(`pt`). Only catalogs that actually exist are selected. `set_language` returns `False` for an unknown
+code and leaves the current language unchanged.
 
-### 8.4 Discovery
+### 8.4 Discovery and switching
 
-`available_languages()` globs `*.json`, sorts by code, and reads `_meta` for display names.
-The GUI language menu is built from this list, so dropping a new JSON file in the directory is the
-entire integration cost — no compilation, no registration.
+`available_languages()` globs `*.json`, sorts by code and reads `_meta` for display names. Both the
+language `select` and the CLI `--lang` value come from that list, so dropping a new JSON file in the
+directory is the whole integration cost — no compilation, no registration, no rebuild.
+
+`POST /api/ui` switches the language, persists it and returns the flattened catalog. The client
+re-renders every `data-i18n` node, so a switch keeps queue state and never reloads the page (D-21:
+the choice also survives a restart).
 
 ### 8.5 Rules
 
-**FR-I18N-1** No user-facing literal in `gui/**` or `cli.py`; use `t()`. (`AGENTS.md` §2.)
+**FR-I18N-1** No user-facing literal in `src/ozempdf/web/**`, `server.py`, `cli.py` or `engine/*`;
+use `t()` in Python and `data-i18n`/`t()` in the UI.
 **FR-I18N-2** Any new or changed string MUST be added to `en.json` in the same change.
-**FR-I18N-3** Locale files MUST remain valid JSON with unique keys.
+**FR-I18N-3** Locale files MUST remain valid JSON with unique keys and no empty values; all three are
+tested.
 
 ---
 
@@ -1180,23 +1184,22 @@ entire integration cost — no compilation, no registration.
 
 | ID | Requirement | Current behaviour |
 | --- | --- | --- |
-| `NFR-1` | UI must stay responsive during batches | compression always off the UI thread |
-| `NFR-2` | Image predictor work must be bounded | predictor loop capped at 4 MP (Mode A) and only offered for ≤ 1.5 MP (Mode B candidate 3) |
+| `NFR-1` | The interface must stay responsive during batches | compression runs in worker processes; the server keeps answering `/api/run` polls |
+| `NFR-2` | Predictor work must be bounded | 4 MP cap in Mode A; candidate 3 offered only at ≤ 1.5 MP |
 | `NFR-3` | Zopfli cost must be explicit | 15 passes default, 25 in Max Slim; `zopfli_compress` always keeps the cheaper of Zopfli vs zlib-9 |
 | `NFR-4` | Batch throughput should scale with cores | one process per file up to `cpu_count()` |
 | `NFR-5` | Repeated analysis must be linear | each stage walks `pdf.objects` once; dedup and DPI walks are cycle-guarded |
 
-Hot paths, in cost order: PNG predictor Python loop → Zopfli passes → full-image decode/encode →
-font subsetting. The per-row predictor loop is the dominant pure-Python cost and the reason for the
-pixel caps.
+Hot paths, in cost order: PNG predictor loop → Zopfli passes → full-image decode/encode → font
+subsetting. The per-row predictor loop is the dominant pure-Python cost and the reason for the pixel
+caps.
 
 ### 9.2 Memory
 
-- One decoded raster is held in RAM at a time per image (`PIL` image + raw bytes + encoded
-  candidate). Very large images (hundreds of MP) can therefore be expensive; there is no streaming
-  tiler.
+- One decoded raster is resident per image (`PIL` image + raw bytes + encoded candidate). Very large
+  images (hundreds of MP) are therefore expensive; there is no streaming tiler.
 - `ProcessPoolExecutor` multiplies that by the worker count. `max_workers` defaults to
-  `min(files, cpu_count)`, which can be aggressive on 8k-photo-heavy folders; `-w` exists for that.
+  `min(files, cpu_count)`, which is aggressive on photo-heavy folders; `-w` exists for that.
 - `bytes_saved_estimate` in dedup and `read_raw_bytes()` calls copy stream payloads.
 
 ### 9.3 Reliability and data safety
@@ -1204,31 +1207,37 @@ pixel caps.
 | ID | Requirement |
 | --- | --- |
 | `NFR-6` | Output writes MUST be atomic (temp file in the destination directory + `os.replace`) |
-| `NFR-7` | The output MUST never be larger than the input, except after an explicit unlock/flatten |
+| `NFR-7` | The output MUST never be larger than the input, except after an explicit unlock/flatten/re-sign |
 | `NFR-8` | A single bad file MUST NOT abort a batch |
-| `NFR-9` | Overwrite mode MUST require explicit confirmation in the GUI, defaulting to No |
+| `NFR-9` | Overwrite mode MUST require explicit confirmation in the interface, defaulting to No |
 | `NFR-10` | Temp files MUST be cleaned up on every exit path |
+| `NFR-11` | Inputs MUST be opened read-only, so cloud placeholders, read-only media and locked files work |
 
 ### 9.4 Cross-platform
 
-`NFR-11` No platform branches: `pathlib`, `QStandardPaths`, `sys._MEIPASS`, and `os.name` only in
-the packaging script for the `--add-data` separator. `NFR-12` `multiprocessing.freeze_support()`
-must remain the first statement of `main()` for frozen Windows builds.
+`NFR-12` No platform branches outside `settings.py` (data locations) and `server.py`
+(`_open_in_os`); everything else uses `pathlib`, `resources.resource_path` (`sys._MEIPASS`) and
+`os.name` only where unavoidable. `NFR-13` `multiprocessing.freeze_support()` must remain the first
+statement of the frozen entry point.
 
 ### 9.5 Accessibility and UX
 
-- `NFR-13` Text contrast: muted body text meets WCAG AA at the rendered sizes.
-- `NFR-14` Every icon-only control has a tooltip; row truncation is elided, never silently clipped.
-- `NFR-15` Column layout uses minimum widths, not fixed widths, so longer translations grow rather
-  than clip.
-- `NFR-16` Animation is skippable via reduced-motion environment variables.
-- `NFR-17` Keyboard-only operation is possible for file add, run, inspect, and every inspector
-  action.
+- `NFR-14` Text contrast: every text/background pair meets WCAG AA at the rendered size; the accent
+  pair is measured in `DESIGN.md`.
+- `NFR-15` Every icon-only control has an accessible name and a tooltip; truncation is ellipsized,
+  never silently clipped.
+- `NFR-16` Column layout uses minimum widths / CSS grid, so longer translations grow rather than clip.
+- `NFR-17` Animation is skippable through `prefers-reduced-motion`; no state is reachable only
+  through animation.
+- `NFR-18` Keyboard-only operation is possible for add, run, inspect and every inspector action;
+  dialogs trap focus and close on `Esc`.
 
 ### 9.6 Portability of data
 
-`NFR-18` Outputs are plain unencrypted PDF; no proprietary wrapper, no sidecar files.
-`NFR-19` Settings are a single small JSON file; deleting it resets the application.
+`NFR-19` Outputs are plain unencrypted PDF; no proprietary wrapper, no sidecar files.
+`NFR-20` Settings are a single small JSON file; deleting it resets the application.
+`NFR-21` A packaged build writes only inside `data/` beside the executable — no `%APPDATA%`, no system
+temp directory.
 
 ---
 
@@ -1237,59 +1246,67 @@ must remain the first statement of `main()` for frozen Windows builds.
 ### 10.1 Trust boundary
 
 All input is untrusted: PDFs are arbitrary binary and may be malformed, adversarially constructed,
-encrypted, or enormous. The process runs with the user's privileges and writes next to the user's
-files.
+encrypted or enormous. The process runs with the user's privileges and writes next to the user's
+files. The local server is reachable by any process on the machine, so it authenticates requests and
+validates origins.
 
 ### 10.2 Attack surface and mitigations
 
-| Surface | Risk | Current handling |
+| Surface | Risk | Handling |
 | --- | --- | --- |
-| Parser (`pikepdf`/qpdf) | memory corruption, pathological recursion | delegated to the C++ library; Python-side loops are cycle-guarded (`visited_forms`) |
-| Huge images | memory exhaustion | no explicit cap; predictor caps reduce CPU, not RAM |
+| Parser (`pikepdf`/qpdf) | memory corruption, pathological recursion | delegated to the C++ library; Python-side walks are cycle-guarded (`visited_forms`) |
+| Huge images | memory exhaustion | no explicit cap; predictor caps reduce CPU, not RAM (documented limitation) |
 | Huge page counts | slow DPI/audit walks | linear per object |
 | Crafted `/Annots`, `/AP`, `/BBox` | malformed geometry writes | every flatten helper is wrapped in `try/except: pass` |
 | Crafted font binaries | fontTools crash | subsetting failures return the original stream |
 | Malformed JPEG | marker-walk desync | `strip_jpeg_bloat_lossless` returns the original bytes on any anomaly |
-| Path traversal via output mapping | writing outside the chosen directory | mapping is built from `relative_to(base_folder)`; a `ValueError` falls back to `output_dir / name` |
-| Symlinks | overwriting an unintended target | `Path.resolve()` is applied consistently; `os.replace` targets the resolved path |
-| Temp files | leftover or predictable names | `tempfile.mkstemp` with a random middle component in the destination directory |
-| Concurrent runs | clobbering the same output | not protected beyond atomic replace; last writer wins |
+| Path traversal via output mapping | writing outside the chosen directory | mapping is built from `relative_to(base_folder)`; `ValueError` falls back to `output_dir / name`; `/api/fs/list` and `/api/upload` reject `..` |
+| Symlinks | overwriting an unintended target | `Path.resolve()` applied consistently; `os.replace` targets the resolved path |
+| Temp files | leftover or predictable names | random `.ozempdf_<random>.tmp.pdf` in the destination directory, removed in `finally` |
+| Local HTTP API | CSRF / unauthorised local calls | per-session token, `Origin` check on writes, `127.0.0.1` binding, CSP `default-src 'self'` |
+| Uploaded paths (browser) | staging outside the app's data dir | uploads land in the app's temp directory and are removed after the run |
+| Concurrent runs | clobbering the same output | one run at a time; collision-indexed output names; last writer wins only for an explicit overwrite |
 
 ### 10.3 Digital signatures
 
 Flattening is **not** signature preservation. Removing `/Sig`, `/SigFlags` and `/Perms` invalidates
 the PKCS#7 byte-range digest by design. The visual appearance is stamped onto the page so the
-document still *looks* signed, but no reader can validate it. This behaviour is:
+document still *looks* signed, but no reader can validate it. This is:
 
-- opt-in by config (`unlock_and_flatten_signatures`), enabled by default in all presets;
-- documented in the README and the About dialog;
-- recorded per run in `signatures_flattened`.
-
-A future revision should surface this as an explicit consent, not a default-on behaviour, because
-it silently changes a legal-evidence artefact. Flagged as `D-14`.
+- opt-in (`unlock_and_flatten_signatures`), off in every preset (D-14);
+- preceded by a consent dialog that states the consequence, and by `--flatten-signatures` on the CLI;
+- recorded per run in `signatures_flattened`;
+- remediable through re-signing: `sign_after_slimming` with a PKCS#12 certificate produces a new
+  signature over the compressed bytes, and a failure fails the file instead of pretending.
 
 ### 10.4 Encryption handling
 
-- Owner restrictions (empty user password) are bypassed, which is the intended feature for the
-  user's **own** files. The empty password is tried first; a supplied open password is used only
-  when the empty one does not open the document.
-- No password dictionary is attempted (D-15 superseded the earlier convenience list): only the
-  caller's password is used, so "wrong password" has exactly one meaning.
-- Output is always decrypted. Users handling regulated documents must be told this explicitly.
+- Owner restrictions (empty user password) are removed, which is the intended feature for the user's
+  **own** files. The empty password is tried first; a supplied open password is used only when the
+  empty one does not open the document.
+- No password dictionary, no brute force, no guessing (D-15): "wrong password" has exactly one
+  meaning, and a password-locked document without a credential is reported, not attacked.
+- Output is always decrypted. Users handling regulated documents are told this in the interface, the
+  README and the results band.
 
 ### 10.5 Privacy
 
-- No network access anywhere in the codebase.
+- No outbound network access anywhere in the product. The only network call that can exist is an
+  explicitly configured RFC 3161 timestamp authority during re-signing.
 - No telemetry, no crash reporting, no analytics.
-- Stripping XMP (optional, off by default outside Max Slim) removes authoring metadata; when off,
-  document metadata survives.
-- Settings contain only UI preferences and output locations.
+- Stripping XMP (off outside Max Slim) removes authoring metadata; when off, document metadata
+  survives.
+- Settings contain only interface preferences and output locations; passwords and PKCS#12
+  passphrases are never persisted.
+- `data/main.log` stays inside the application folder and records startup/shutdown facts, not
+  document contents or paths beyond what is needed to diagnose a launch failure.
 
 ### 10.6 Dependency provenance
 
-Six runtime dependencies, all widely used and permissively licensed; bundled Inter and JetBrains
-Mono are OFL with license texts shipped in `resources/fonts/OFL-*.txt`. `OFL` notices must be kept
-in packaged builds.
+Six runtime Python dependencies, all widely used and permissively licensed; the bundled IBM Plex Sans
+and JetBrains Mono faces are OFL with their license texts shipped under `web/fonts/`. Electron is the
+only Node dependency and ships its own licenses through the packaging step. `OFL` notices must be
+kept in packaged builds.
 
 ---
 
@@ -1299,35 +1316,47 @@ in packaged builds.
 
 | Exception | Raised by | Handling |
 | --- | --- | --- |
-| `pikepdf.PasswordError` | `pikepdf.open` | converted to `PasswordRequiredError` after exhausting candidates |
-| `PasswordRequiredError` | `unlock.open_and_unlock_pdf` | surfaces as a failed file result |
-| `BatchCancelledError` | `gui.worker` progress callback | caught by the worker; emits `batch_cancelled` |
-| `OSError` (stat, mkdir, replace) | pipeline / settings | propagates to the per-file catch-all, or is swallowed for settings |
+| `pikepdf.PasswordError` | `pikepdf.open` | converted to `PasswordRequiredError` once the empty password and the caller's password have both failed |
+| `PasswordRequiredError` | `unlock.open_and_unlock_pdf` | becomes a failed result carrying `required_password`; the interface offers one prompt and retries |
+| `UnsupportedProtectionError` | `unlock.inspect_protection`/open | becomes a failed result with `protection_kind = "unsupported"` and an explanation |
+| `PermissionError` | stat/open/save | becomes an actionable message naming the path, not a bare errno |
+| `SigningError` | `signing.sign_pdf` | becomes a failed result; no unsigned output is claimed as signed |
+| `BatchCancelledError` | the progress callback | caught by the batch; finished work is kept, unstarted work is not dispatched |
+| `OSError` (stat, mkdir, replace) | pipeline / settings | per-file catch-all, or swallowed for settings |
 | Any other `Exception` | any stage | caught by `compress_pdf_file`; becomes `success=False` |
-| `BaseException` | — | never caught (a hard kill leaves no temp file because of the `finally`) |
+| `BaseException` | — | never caught; the `finally` still removes the temp file on a normal kill |
 
 ### 11.2 Failure matrix
 
 | Failure | Result | User-visible effect |
 | --- | --- | --- |
 | Input missing | `success=False`, "Input file does not exist" | row error + Retry |
-| Password protected, no matching candidate | `success=False`, "protected by a user open-password" | row error + Retry |
-| Corrupt PDF | `success=False` with pikepdf message | row error + Retry |
+| Permission denied on the input | `success=False`, message naming the path and the likely holder | row error + Retry |
+| Open password, no credential | `success=False`, `required_password=True` | password prompt, retried once |
+| Certificate encryption | `success=False`, `protection_kind="unsupported"` | open-lock badge and an explanatory error |
+| Corrupt PDF | `success=False` with the pikepdf message | row error + Retry |
 | Image decode failure | image skipped, file still succeeds | smaller savings |
 | Font subsetting failure | original font kept | smaller savings |
-| Output not smaller | original copied, `kept_original_guardrail=True` | `-0.0%` savings row |
+| Output not smaller | original copied, `kept_original_guardrail=True` | "already as small as it gets" note |
 | Disk full during save | `success=False` | row error + Retry |
+| Signing failure | `success=False`, compressed output discarded | row error naming the certificate problem |
 | Settings unwritable | silently ignored | preferences not remembered |
 
 ### 11.3 Diagnostics available today
 
-Only `FileCompressionResult.error_message` and the per-stage stats. There is **no** logging
-framework, no log file, no debug switch, and no correlation id. This is `D-10`.
+- `logging_setup.py`: `--verbose` or `OZEMPDF_LOG=1` emits DEBUG lines with per-file timings to
+  stderr; normal runs stay silent (D-10).
+- `data/main.log`: the Electron shell appends startup, engine spawn/exit and renderer-crash lines, so
+  a window that never opens leaves evidence. This is also how the Electron 45 sandbox abort was
+  identified.
+- `FileCompressionResult` and the per-stage stats: the structured record of what a run did.
+- The JSON report (`--json-report`) and `/api/report`: the same facts in a form a script can read.
 
-### 11.4 Recommended diagnostic contract
+### 11.4 Server error contract
 
-`NFR-20` (proposed): a `--verbose` flag and a `OZEMPDF_LOG` environment variable that emit
-per-stage timings and counts to stderr without changing exit codes.
+Every `/api/*` failure returns a JSON body with an HTTP status and a localized `error` string;
+internal exceptions are logged and mapped to 500 without leaking a traceback to the client. A missing
+output path in `/api/open` is reported, not raised (tested).
 
 ---
 
@@ -1335,10 +1364,11 @@ per-stage timings and counts to stderr without changing exit codes.
 
 ### 12.1 Strategy
 
-Black-box integration tests over synthetic fixtures generated at test time, verifying observable
-PDF properties rather than internal calls: decoded pixels, operator sequences, encryption state,
-`/Perms`, `/PieceInfo`, `/Thumb`, font stream size, path mapping, CLI exit codes, and headless GUI
-state.
+Black-box integration tests over synthetic fixtures generated at test time, verifying observable PDF
+properties rather than internal calls: decoded pixels, operator sequences, encryption state,
+`/Perms`, `/PieceInfo`, `/Thumb`, font stream size, path mapping, CLI exit codes, HTTP responses and
+interface state. Fixtures are built, never committed, so a test can assert on the bytes it produced
+in this run.
 
 ### 12.2 Configuration
 
@@ -1347,42 +1377,40 @@ state.
 ```toml
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "."]
+pythonpath = ["src"]
+addopts = "-ra"
 ```
 
-Run with `pytest -v`. GUI tests force `QT_QPA_PLATFORM=offscreen`.
+Run `python -m pytest -q` (~10 s, 76 tests) and `ruff check src tests`. Interface tests drive the real
+server through `http.client`; no browser is required, and no Qt platform plugin is involved.
 
 ### 12.3 Inventory
 
-| Test | File | Verifies |
+| Module | Tests | Verifies |
 | --- | --- | --- |
-| `test_strict_lossless_bit_identical_pixels_and_savings` | `test_lossless.py` | Mode A yields > 50 % reduction with identical RGB bytes and identical operator sequences; opaque `/SMask` stripped; duplicate images merged; `/PieceInfo` and `/Thumb` removed |
-| `test_never_grow_guardrail_preserves_tiny_pdf` | `test_lossless.py` | A tiny already-compact PDF is not enlarged; guardrail flag set |
-| `test_effective_dpi_calculation_from_ctm` | `test_visually_lossless.py` | 1800×1200 in a 3×2 in box → 600 DPI (±5); 1200×900 in 4×3 in → 300 DPI (±5) |
-| `test_visually_lossless_balanced_mode_compression` | `test_visually_lossless.py` | High-DPI photo downsampled, UI screenshot indexed, 70–90 %+ total reduction, vectors preserved |
-| `test_max_slim_mode_extra_reduction` | `test_visually_lossless.py` | Max Slim reduces at least as much as Balanced |
-| `test_unlock_flatten_signatures_and_subset_fonts` | `test_security_and_fonts.py` | Encrypted input decrypted; 1 signature flattened; `/Perms` gone; `/Annots` emptied; font subset; output smaller |
-| `test_recursive_discovery_and_custom_folder_hierarchy` | `test_batch.py` | Recursive discovery, nested output mapping, parallel batch success |
-| `test_page_thumbnail_renderer` | `test_batch.py` | PNG bytes returned for page 1 |
-| `test_cli_execution_and_json_report` | `test_batch.py` | CLI runs, writes a JSON report, exit code 0 |
-| `test_i18n_translation_and_fallback` | `test_batch.py` | Dotted lookup, interpolation, English fallback, language discovery |
-| `test_gui_three_step_workflow_and_smart_incremental_queue` | `test_gui.py` | Step transitions, preset switching, theme toggle, aggregate breakdown default, single-file selection, incremental queue |
-| `test_preview_inspector_dialog_headless` | `test_gui.py` | Inspector constructs offscreen, renders pages, wipe slider works |
+| `tests/test_lossless.py` | 9 | Bit-identical pixels *and* identical decoded content bytes in Strict Lossless; guardrail keeps a tiny file (`kept_original_guardrail`, `already_optimal`); duplicate images, opaque `/SMask`, `/PieceInfo` and `/Thumb` removed; Max Slim strips metadata but Lossless keeps it; an image stream is only replaced when strictly smaller; vector-only documents are not rasterised; every preset still renders a page |
+| `tests/test_visually_lossless.py` | 9 | 600 effective DPI derived from the CTM; Balanced downsamples it and Max Slim is not larger; a screenshot becomes `/Indexed` rather than JPEG; a low-DPI image is left alone; Predictor-15 round-trips all five filters for bpp 1 and 3; Paeth matches reference values |
+| `tests/test_security_and_fonts.py` | 15 | Owner-encrypted signed document is decrypted and flattened; permission restrictions removed without a password; a supplied password does not break permission-only files; a mixed batch shares one password; an open password without a credential is reported, not guessed; `"1234"` fails; inputs open read-only; a permission error is actionable; protection is classified; unsupported encryption is reported; flatten-disabled keeps the signature; a subset font is still a valid sfnt; re-signing produces a real `/ByteRange` signature; a wrong certificate password fails cleanly and leaves no output |
+| `tests/test_batch.py` | 15 | Sorted recursive discovery and previous-output exclusion; the three output modes; collision suffixing; empty suffix fallback; parallel ordering and progress; cancel stops dispatch but keeps finished work; thumbnails and page renders; a failed file leaves no temp and keeps the original; CLI single file with a JSON report; pure-JSON stdout; exit codes 1 and 2; localized help; flag mapping |
+| `tests/test_settings.py` | 6 | Whitelist-only persistence and secrets never persisted; portable data-dir override; corrupt and unwritable settings fall back silently; language round-trips through `AppState`; `from_preset` accepts an enum member |
+| `tests/test_i18n.py` | 7 | Translation and fallback; formatting errors return the template; unknown language keeps the current one; discovery and listeners; every static key exists; zero orphan keys; no empty values |
+| `tests/test_web.py` | 15 | Index serves the UI and sets the session cookie; the version chip matches `_version.py`; the API refuses a token-less request; static traversal is blocked; add → run → images; `fs/list` filters and hides; certificate picker; upload staging; a preset change keeps the destination; opening a missing output is reported, not raised; incremental queue after a run; row removal; preload paths queue on first load; protection kind is reported; language switch |
 
-Twelve tests across five modules; fixtures are built by `tests/generate_test_pdfs.py`
-(447 lines) covering flat-UI rasters, grayscale RGB, high-DPI photos, opaque `/SMask`s,
-duplicate images, `/PieceInfo`/`/Thumb` bloat, an embedded TrueType font, an owner-encrypted PDF
-with a visible signature widget.
+Fixtures live in `tests/pdf_fixtures.py` (337 lines): flat and gradient rasters, an opaque `/SMask`,
+duplicate images, `/PieceInfo`/`/Thumb`/XMP bloat, a synthetic TrueType font built with
+`FontBuilder`, an owner-encrypted PDF with a visible signature widget, an open-password PDF, an
+unsupported-encryption PDF, and a nested folder tree.
 
 ### 12.4 Coverage gaps
 
-- No fuzz or malformed-PDF corpus (truncated xref, corrupt JBIG2, zero-page PDFs).
+- No fuzz or malformed-PDF corpus (truncated xref, corrupt JBIG2, zero-page documents).
 - No performance or memory regression test.
-- No test for `CUSTOM_FOLDER` collisions, unwritable destinations, or full disks.
-- No test for `--overwrite` atomicity.
-- No test for cancellation semantics.
-- No CI workflow exists in the repository (`.github/` absent), so the suite is developer-run only.
-- No test asserts `CONTRIBUTING`-style invariants (i18n coverage, docstrings, types).
+- No automated test of Electron itself; the packaged app is verified by launching it and checking
+  `data/main.log`, the engine child and the window title.
+- No browser-automation test of layout or focus order; visual review covers both themes at desktop
+  and mobile widths.
+- No test for a full disk.
+- macOS and Linux builds are configured in CI but not exercised end to end.
 
 ---
 
@@ -1392,19 +1420,19 @@ with a visible signature widget.
 
 | Key | Value |
 | --- | --- |
-| Build backend | `setuptools.build_meta`, `setuptools>=68` |
+| Build backend | `setuptools.build_meta`, `setuptools>=77` |
 | Distribution name | `ozempdf` |
 | Version | dynamic from `ozempdf._version.__version__` |
 | Python | `>=3.10` |
-| Runtime deps | pikepdf, Pillow, zopfli, fonttools, pypdfium2, PySide6 |
+| Runtime deps | pikepdf, Pillow, zopfli, fonttools, pypdfium2, pyhanko |
 | Dev extras | pytest, pyinstaller |
 | Console script | `ozempdf = ozempdf.__main__:main` |
-| GUI script | `ozempdf-gui = ozempdf.gui:launch_gui` |
-| Package data | `locales/*.json`, `resources/fonts/*.ttf`, `resources/fonts/*.txt` |
+| GUI script | `ozempdf-gui = ozempdf.gui:launch_gui` (starts the local server and opens the browser) |
+| Package data | `locales/*.json`, `web/*.{html,css,js}`, `web/fonts/*` |
 | Package discovery | `src/` layout |
 
-Package data is load-bearing: without it a wheel lacks strings and fonts and the UI falls back to
-raw keys and system typography.
+Package data is load-bearing: without it a wheel lacks strings, styles, scripts and fonts, and the
+interface falls back to raw keys and system typography.
 
 ### 13.2 Install from source
 
@@ -1413,47 +1441,70 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate
 # POSIX:   source .venv/bin/activate
 pip install -e ".[dev]"
+ozempdf --serve          # interface in the browser
 ```
+
+The Electron shell additionally needs `npm install` inside `app/`.
 
 ### 13.3 Standalone builds
 
-`build_cross_platform.py` performs a pre-flight import check for the seven modules and runs
-`pip install -e ".[dev]"` if any is missing, then invokes PyInstaller with:
+Two artefacts, in order:
 
-- `--onefile --windowed --noconfirm --clean --name OzemPDF`
-- `--paths src`
-- `--add-data <locales>{os-sep}ozempdf/locales`
-- `--collect-all pikepdf pypdfium2 pypdfium2_raw zopfli`
-- `--collect-submodules fontTools ozempdf`
-- explicit hidden imports for `pikepdf._core`, `pikepdf.models`, `lxml.*`, `zopfli.zlib`,
-  `fontTools.ttLib`, `fontTools.subset`, `PIL`, `PIL.Image`, `pypdfium2`, and the three Qt modules.
+1. **Frozen engine** — `python build_cross_platform.py` runs PyInstaller with
+   `--onedir --console --name ozempdf-engine --paths src`, adds `locales/` and `web/` (fonts
+   included) via `--add-data`, collects `pikepdf`, `pypdfium2` and `zopfli`, and declares the hidden
+   imports the dynamic loaders need. Output: `dist/engine/ozempdf-engine/ozempdf-engine.exe`.
+   `--onefile` was rejected: it extracts to a temp directory at startup and failed with "Could not
+   create temporary directory" on locked-down hosts, and a one-dir build also starts faster.
+2. **Desktop app** — `cd app && npm run dist` runs `electron-builder` with the `zip` target only,
+   copying `dist/engine` as `resources/engine` plus the two launchers and the icon. Output:
+   `app/release/OzemPDF-0.3.3-win.zip` (~172 MB).
 
-`build_windows.bat` wraps it: it selects `.venv\Scripts\python.exe`, else `.venv_win\Scripts\python.exe`,
-else creates `.venv_win`, verifies imports, installs dependencies, and delegates.
+`electron-builder` is configured for `win`, `mac` and `linux` zip targets. NSIS and the
+self-extracting portable exe were **removed**: the installer executes the generated installer to
+extract its uninstaller, which the reference host blocks, and a portable app should not leave an
+installer's traces. The ZIP is the deliverable.
 
-**Note:** only `locales/` is passed via `--add-data`. The bundled fonts directory is **not**
-declared to PyInstaller, and PyInstaller does not copy arbitrary package data on its own —
-`--collect-submodules ozempdf` registers *modules*, not data files. A frozen build can therefore
-ship without the Inter / JetBrains Mono TTFs; `install_bundled_fonts` skips missing files silently
-and the UI falls back to system typography. Add
-`--add-data <fonts>{os-sep}ozempdf/resources/fonts` (`D-05`).
+`build_cross_platform.py` performs a pre-flight import check and installs missing dependencies
+before building; it never edits the version.
 
-### 13.4 Versioning and changelog
+### 13.4 Portable data
+
+A packaged build owns exactly one writable directory: `data/` beside the executable.
+
+- `settings.py` resolves it from `OZEMPDF_DATA_DIR`, else by walking up from the frozen engine to the
+  folder containing `resources/` or `OzemPDF.exe`, and creates `data/` there.
+- `app/main.js` redirects `userData`, `sessionData`, `crashDumps` and `TEMP`/`TMP`/`TMPDIR` into the
+  same folder and passes `OZEMPDF_DATA_DIR` to the engine, so Electron's caches, its log and the
+  engine's temp files all stay inside the copy.
+- A source install uses the platform location (`%APPDATA%/OzemPDF`, `~/.config/OzemPDF`); the dev
+  checkout uses `app/.dev-data`.
+
+Verified by extracting the ZIP to a folder such as `D:\OzemPDF`, launching `OzemPDF.exe` with no
+flags, and confirming that only `data/` appears next to it and `%APPDATA%\OzemPDF` is untouched
+(`tests/test_settings.py::test_portable_data_dir_override` covers the resolution rule).
+
+### 13.5 Versioning and changelog
 
 - Single source of truth: `src/ozempdf/_version.py` (`__version__`, `__version_info__`).
-- `CHANGELOG.md` follows Keep a Changelog, with `Added` / `Changed` / `Fixed` sections per version.
-- **CON-1** Every milestone or behaviour change MUST update both files (`AGENTS.md` §4).
-- **CON-2** Commits MUST be atomic and use conventional-commit messages.
+- The version also appears in `app/package.json`, `package-lock.json`, the README header, the ZIP
+  name and the interface's version chip (rendered from the API, not hardcoded).
+- `CHANGELOG.md` follows Keep a Changelog with `Added` / `Changed` / `Fixed` / `Removed` per version.
+- **CON-1** Every behaviour change MUST update the changelog and, when the release changes, the
+  version (`AGENTS.md`).
+- **CON-2** Commits MUST be atomic, conventional, and GPG-signed.
 
-### 13.5 Release checklist
+### 13.6 Release checklist
 
-1. Tests green on Windows, macOS, Linux.
-2. `_version.py` and `CHANGELOG.md` updated.
-3. README feature list reviewed against behaviour (see the discrepancies in §16).
-4. `en.json` key coverage complete; no orphan keys.
-5. Build the frozen binary on each target and smoke-test: open, add a PDF, slim, inspect, open
-   output.
-6. Verify the wheel includes `locales/*.json` and `resources/fonts/*`.
+1. `python -m pytest -q` and `ruff check src tests` green; `node --check` on the interface scripts.
+2. `_version.py`, `app/package.json`, README and `CHANGELOG.md` agree.
+3. `en.json` key coverage complete and no orphan keys (covered by tests).
+4. Build the engine, then the ZIP; confirm it contains `OzemPDF.exe`, the two launchers and
+   `resources/engine/`.
+5. Extract outside the development workspace and launch with no flags: window title, version chip,
+   `data/` created, `%APPDATA%` untouched.
+6. Serve the UI from the browser launcher and request `/` and `/api/bootstrap`.
+7. Review the README feature list against behaviour before announcing the version.
 
 ---
 
@@ -1461,54 +1512,58 @@ and the UI falls back to system typography. Add
 
 ### 14.1 Add a compression knob
 
-1. Add the field to `CompressionConfig` with a docstring entry and a default.
-2. Set it explicitly in **all three** `from_preset` branches.
-3. Consume it in exactly one pipeline stage; gate the call with the flag.
-4. Expose it in the GUI advanced drawer (control + tooltip) and in `_sync_controls_from_config`,
-   `_on_advanced_Option_changed`, `_persist_settings`, `_config_from_settings`.
+1. Add the field to `CompressionConfig` with a default and a docstring entry.
+2. Set it explicitly in **all three** `from_preset` branches (or document why a preset ignores it).
+3. Consume it in exactly one pipeline stage, gated by the flag.
+4. Expose it in the drawer (`index.html`), read/write it in `app.js`, and add `advanced.*` keys for
+   label and tooltip.
 5. Add the CLI flag and map it in `build_config_from_args`.
-6. Add `advanced.*` keys to `en.json` (label + tip) and retranslate in `_retranslate_workspace`.
-7. Extend the JSON result if the knob has observable output counters.
-8. Add a test that toggles it and asserts a PDF property.
+6. Extend the JSON result if the knob has observable counters, and keep the schema backwards
+   compatible.
+7. Add a test that toggles it and asserts a PDF property (not an internal call).
 
 ### 14.2 Add a pipeline stage
 
 1. New module under `engine/` with a stats dataclass, exported from `engine/__init__.py`.
-2. Wire it into `compress_pdf_file` **after** analysis and **before** save, respecting
-   `INV-1`/`INV-2`.
-3. Add the stats object to `FileCompressionResult` and its `to_dict`.
-4. Decide whether it needs a config flag; if so follow §14.1.
-5. Add a test with a purpose-built fixture.
+2. Wire it into `compress_pdf_file` after analysis and before save, respecting `INV-1`/`INV-2`.
+3. Add the stats to `FileCompressionResult` and its `to_dict`.
+4. Decide whether it needs a config flag; if so, follow §14.1.
+5. Add a purpose-built fixture and a test.
 
 ### 14.3 Add a locale
 
-Copy `locales/en.json` to `<code>.json`, translate values (leave `_meta.code` consistent), run the
-app. No registration needed; the GUI menu and `OZEMPDF_LANG` discover it. Verify with
-`pytest tests/test_batch.py::test_i18n_translation_and_fallback` style lookups.
+Copy `locales/en.json` to `<code>.json`, translate the values, keep `_meta.code` consistent, and run
+the app — discovery is automatic for the `select`, the CLI and `OZEMPDF_LANG`. The i18n tests then
+assert that the new catalog has no orphan keys and no empty values. A new key added only to `en.json`
+is a test failure, which is deliberate.
 
-### 14.4 Add an icon
+### 14.4 Add an interface glyph or a surface
 
-Add the inner SVG markup for a 24×24 viewBox to `ICONS`, using stroke-only paths (the wrapper
-applies `fill="none"` and the stroke colour). Use `make_icon("name", color)` for buttons and
-`icon_pixmap("name", px, color)` for label pixmaps. Update the icon count in
-`CHANGELOG.md` if it changes a stated number.
+- Icons: add one `<symbol id="i-name" viewBox="0 0 24 24">` to the inline sprite in `index.html` and
+  reference it with `<use href="#i-name">`; stroke-only, inherits `currentColor`.
+- A new dialog: a native `<dialog>` with `aria-labelledby`, a focus trap, `Esc` to close, and strings
+  in the catalog. Never a bespoke overlay — native dialogs give focus management and the backdrop for
+  free.
+- A new API route: add it to `server.py`, require the session token, validate the method and origin,
+  return JSON, and cover it in `tests/test_web.py`.
 
 ### 14.5 Add a preset
 
-Add an enum member, a `from_preset` branch, a GUI pill (or hide it from the pills and treat it as
-programmatic), locale copy for name/description/tooltip, and a CLI `choices` entry if user-facing.
+Add the enum member, a `from_preset` branch, a pill in the drawer's segmented control, catalog copy
+for name/description, and a CLI `choices` entry if it is user-facing.
 
 ### 14.6 Engineering constraints (`CON`)
 
 | ID | Constraint |
 | --- | --- |
-| `CON-1` | Version + changelog updated per milestone |
-| `CON-2` | Atomic conventional commits |
-| `CON-3` | Full type annotations and Google-style docstrings on every module/class/function |
-| `CON-4` | Inline comments explain PDF-spec mechanics (CTM math, `/SMask`, `/Indexed`, Predictor 15, Zopfli, `/Sig`) |
+| `CON-1` | Version and changelog updated per change |
+| `CON-2` | Atomic conventional, GPG-signed commits |
+| `CON-3` | Full type annotations and Google-style docstrings on every module, class and function |
+| `CON-4` | Inline comments explain PDF mechanics (CTM math, `/SMask`, `/Indexed`, Predictor 15, Zopfli, `/Sig`) |
 | `CON-5` | No hard-coded user-facing strings (see `INV-5`) |
-| `CON-6` | No platform-specific hacks (see `INV-4`) |
-| `CON-7` | Every stage optimisation is guarded by a strict-size check |
+| `CON-6` | No platform-specific hacks outside `settings.py` and `server.py` (see `INV-4`) |
+| `CON-7` | Every optimisation is guarded by a strict-size check |
+| `CON-8` | No dependency for something the standard library or an installed package already does |
 
 ---
 
@@ -1524,7 +1579,8 @@ def compress_pdf_file(
 ) -> FileCompressionResult
 ```
 
-Single-file entry point. `output_path` may equal `input_path` for atomic in-place overwrite.
+Single-file entry point. `output_path` may equal `input_path` for atomic in-place overwrite; the input
+is only ever read.
 
 ```python
 def run_batch_compression(
@@ -1534,7 +1590,8 @@ def run_batch_compression(
 ) -> BatchSummary
 ```
 
-Batch entry point. Each item may be a bare path or `(path, base_folder)`.
+Batch entry point. Each item may be a bare path or `(path, base_folder)`; results come back ordered by
+input index.
 
 ```python
 def discover_pdf_files(
@@ -1547,16 +1604,17 @@ def resolve_output_path(
 
 def inspect_pdf_quick_metadata(path: Path, password: str = "") -> tuple[int, int]
 
-def render_page_thumbnail_png(
-    path: Path, page_index: int = 0, max_dimension: int = 112
-) -> bytes | None
+def render_page_png(path: Path, page: int = 0, zoom_percent: int = 200) -> bytes | None
+
+def sign_pdf(path: Path, config: CompressionConfig) -> None
 ```
 
 ### 15.2 Stage API
 
 | Function | Contract |
 | --- | --- |
-| `open_and_unlock_pdf(path, password="", flatten_signatures=True)` | returns `(pdf, UnlockStats)`; raises `PasswordRequiredError` |
+| `open_and_unlock_pdf(path, password="", flatten_signatures=False)` | returns `(pdf, UnlockStats)`; raises `PasswordRequiredError`, `UnsupportedProtectionError` |
+| `inspect_protection(path, password="")` | returns `ProtectionInfo` |
 | `flatten_and_strip_signatures(pdf)` | mutates; returns `(count, perms_removed)` |
 | `audit_pdf_bytes(pdf, file_size=None)` | returns `CategoryBreakdown` |
 | `calculate_effective_image_dpis(pdf)` | returns `{objgen: max_dpi}` |
@@ -1566,121 +1624,190 @@ def render_page_thumbnail_png(
 | `strip_structural_bloat(pdf, config, stats)` | mutates `stats` |
 | `recompress_content_streams(pdf, config, stats)` | mutates `stats` |
 | `zopfli_compress(data, iterations=15)` | returns zlib-wrapped deflate bytes |
-| `format_bytes(n)` | human-readable string |
+| `format_bytes(n)`, `format_percent(p)` | human-readable strings |
 | `t(key, **kwargs)`, `set_language(code)`, `available_languages()`, `register_language_listener(cb)` | localization facade |
-| `launch_gui(initial_paths=None)` | returns process exit code |
+| `launch_gui(initial_paths=None)` | starts the local server and opens the browser; returns an exit code |
+| `serve(port=0, open_browser=True)` | blocks serving the interface and API |
 
-`engine/__init__.py` re-exports the public surface; imports should use that facade where possible.
+`engine/__init__.py` re-exports the public engine surface; imports should use that facade.
 
-### 15.3 GUI classes
+### 15.3 Web client and HTTP API
 
-| Class | Module | Role |
+The client is three static files (`index.html`, `styles.css`, `app.js`) plus bundled fonts. Every
+route below requires the session token except `/api/bootstrap` and the static files.
+
+| Route | Method | Purpose |
 | --- | --- | --- |
-| `OzemPDFMainWindow` | `gui/main_window.py` | application window, state machine |
-| `OutputPopoverPopup` | `gui/main_window.py` | output destination popover |
-| `FileQueueRowWidget` | `gui/main_window.py` | queue row |
-| `SavingsBreakdownWidget`, `_CategorySubCard`, `AnimatedMiniBar` | `gui/breakdown_widget.py` | Step 3 breakdown |
-| `PreviewInspectorDialog`, `WipeCompareCanvas` | `gui/preview_dialog.py` | quality inspector |
-| `ThumbnailLoaderThread`, `BatchCompressionWorker`, `BatchCancelledError` | `gui/worker.py` | background work |
-| `ThemePalette`, `DARK_PALETTE`, `LIGHT_PALETTE`, `build_stylesheet` | `gui/theme.py` | theming |
-| `icon_pixmap`, `make_icon`, `icon_svg`, `ICONS` | `gui/icons.py` | icon set |
-| `install_bundled_fonts` | `gui/fonts.py` | typography |
-| `settings_path`, `load_settings`, `save_settings` | `gui/settings.py` | persistence |
+| `/` | GET | the interface; sets the `ozempdf_token` cookie |
+| `/static/*`, `/fonts/*` | GET | CSS, JS and font files |
+| `/api/bootstrap` | GET | version, language, catalog list, presets, persisted config, queue |
+| `/api/queue/add` | POST | add paths; returns accepted rows and `skipped[]` with localized reasons |
+| `/api/queue/remove`, `/api/queue/clear`, `/api/queue/retry` | POST | queue edits |
+| `/api/run/start`, `/api/run/stop` | POST | begin or cooperatively stop a batch |
+| `/api/run` | GET | live state: rows, progress, results, summary |
+| `/api/config` | POST | set knobs; the response echoes the clamped values |
+| `/api/preset` | POST | apply a preset while preserving the output destination |
+| `/api/ui` | POST | switch language/persistence; returns the flattened catalog |
+| `/api/fs/list` | POST | folder browsing for the picker (hidden entries filtered, `..` rejected) |
+| `/api/open` | POST | open a file or reveal it in the OS |
+| `/api/upload` | POST | stage a browser drop and return its local path |
+| `/api/thumb` | GET | page-1 thumbnail for a queue row |
+| `/api/page` | GET | page render at a chosen zoom for the inspector |
+| `/api/report` | GET | the JSON report of the current batch |
+
+The API is the contract between the two shells and the tests: no UI behaviour is implemented twice,
+and the browser build is a real fallback rather than a demo.
 
 ---
 
-## 16. Known limitations and discrepancies
+## 16. Defect ledger and known limitations
 
-Defects and documentation drift observed at the time of writing. Each is either an accuracy problem
-or a small correctness/UX issue; none invalidates the core invariants.
+### 16.1 The 21 recorded defects
 
-| ID | Where | Observation | Impact | Recommendation |
-| --- | --- | --- | --- | --- |
-| `D-01` | `README.md`, `locales/en.json` | Copy claims **MozJPEG**; the implementation uses Pillow's JPEG encoder (libjpeg-turbo) with `quality`, `optimize=True`, `progressive=True`, `subsampling="4:2:0"` | Marketing/copy inaccurate; tuning advice may not transfer | Re-word to "progressive JPEG (Pillow/libjpeg-turbo)" or adopt mozjpeg |
-| `D-02` | `image_optimizer.py` | Predictor docstrings and README claim adaptive None/Sub/Up/**Average**/**Paeth**; implementation supports 0/1/2 only and `_paeth_predictor` is dead code | Lower compression on some images than advertised; dead code | Implement Average/Paeth selection or correct the docs and delete the helper |
-| `D-03` | `main_window.py` vs `config.py`/`cli.py` | GUI DPI slider is 72–300; config/CLI allow 72–600 | GUI cannot request a 600 DPI target; Strict Lossless is represented by a display hack (`slider >= 300` ⇒ "No Downsampling") | Widen the slider or use a log scale; replace the display hack with a real mode |
-| `D-04` | `main_window.py` vs `cli.py` | GUI JPEG slider max 95; CLI clamps to 98 | Minor capability mismatch between surfaces | Align ranges |
-| `D-05` | `OzemPDF.spec`, `build_cross_platform.py` | The spec hard-codes `D:/dev/pdf-compress/...`; `*.spec` is git-ignored yet the file is tracked; the fonts directory is not passed via `--add-data` (only `locales/` is) | A committed spec build fails from any other checkout; frozen builds likely ship without the bundled fonts and fall back to system typography | Delete the generated spec, rely on `build_cross_platform.py`, and add an explicit `--add-data` for `resources/fonts` |
-| `D-06` | `CHANGELOG.md` | States "32 vector SVG glyphs"; `ICONS` has 37 | Stale count | Update the entry |
-| `D-07` | `gui/settings.py` | `PERSISTED_KEYS` is defined but never referenced, and it advertises `language`, which is never written (see `D-21`) | Dead constant that looks authoritative and masks the language bug | Drive the payload from it, or remove it |
-| `D-08` | `locales/en.json` | Unused keys: `header.language_tooltip`, `footer.btn_add_more`, `inspector.page_indicator`, `inspector.zoom_label`, `inspector.btn_zoom_in`, `inspector.btn_zoom_out`, `step2.row_tip_error` | Translation surface larger than necessary; untranslated dead copy can rot | Add a key-usage test or prune |
-| `D-09` | `README.md` | Title says `v0.1.0` while the package is `0.2.0`; still describes emoji glyph buttons and Ghostscript/MozJPEG comparisons | First impression contradicts the product | Refresh README against 0.2.0 |
-| `D-10` | whole codebase | No logging, no log file, no `--verbose`, no timings beyond per-file elapsed | Hard to diagnose user reports | Introduce `logging` + `OZEMPDF_LOG` |
-| `D-11` | `cli.py` | `argparse` `help=` strings are English literals while `description`/`epilog` use `t()` | Violates `INV-5`; `--help` is not localizable | Move help text into `en.json` |
-| `D-12` | `pipeline.py` | `kept_original_guardrail` is absent from `to_dict()` | JSON consumers cannot tell "already compact" from "no reduction" | Add the flag to the JSON schema |
-| `D-13` | `main_window.py` | `_prefers_reduced_motion` probes `styleHints().businessProperties()`, which is not a `QStyleHints` API, so the lookup is dead; only `OZEMPDF_REDUCED_MOTION` / `REDUCE_MOTION` actually disable motion | Users who set the OS "reduce motion" preference still get animation | Query the platform signal available in the target Qt version, or document the env vars as the only switch |
-| `D-14` | `unlock.py`, presets | Signature flattening is on by default and silently invalidates signatures | Legal/evidentiary surprise | Require explicit consent, or default off and document |
-| `D-15` | `unlock.py` | Automatically tries `" "`, `"1234"`, `"password"`, `"admin"` | Convenience with an obvious misuse angle; also makes "wrong password" ambiguous | Keep only user-supplied passwords, or gate behind a flag |
-| `D-16` | `analyzer.py` | `/Thumb` is first added to the metadata set but images are counted by `/Subtype /Image`, so a thumbnail carrying `/Subtype /Image` lands in images | Category attribution for thumbnails is ambiguous between before/after runs | Classify `/Thumb` by role before subtype |
-| `D-17` | `font_optimizer.py` | `/ToUnicode` savings contribute `bytes_saved` but not `font_streams_optimized` | Reported font counts understate activity | Add a separate counter |
-| `D-18` | `batch.py`, `cli.py` | No collision detection for output paths; `CUSTOM_FOLDER` without a base folder can map two inputs to one output | Silent overwrite of a slimmed output | Detect and suffix on collision |
-| `D-19` | repository | No CI, no linter/formatter config, no `CONTRIBUTING.md`, no license file | Quality gates are manual; license status unclear | Add `.github/workflows`, ruff/mypy config, LICENSE |
-| `D-20` | `pipeline.py` | The `pdf` argument to `optimize_single_image` is unused by the helpers | Dead parameter threaded through the API | Drop it or use it for `make_indirect` |
-| `D-21` | `main_window.py`, `settings.py`, `CHANGELOG.md` | Language choice is not persisted despite the 0.2.0 changelog entry and `PERSISTED_KEYS` listing `language`; `_persist_settings` omits the key and launch never restores it | UI language resets to the OS locale on every start | Add `language` to the payload and call `set_language` during window construction |
+Every defect in the original ledger is closed in the current tree; `docs/DISCREPANCIES.md` records
+the evidence (test or code path) for each. This table is the short form.
+
+| ID | Defect at 0.2.0 | Resolution at 0.3.3 |
+| --- | --- | --- |
+| `D-01` | Copy claimed MozJPEG; encoder was Pillow/libjpeg-turbo | Claim removed; docs say "progressive JPEG (Pillow/libjpeg-turbo)" |
+| `D-02` | Predictor documented five filters, implemented None/Sub/Up; Paeth dead | All five filters implemented and selected per row; round-trip and reference tests |
+| `D-03` | GUI DPI stopped at 300; Strict Lossless was a slider display hack | One range 72–600 everywhere; `strict_lossless` is a real flag |
+| `D-04` | GUI JPEG max 95, CLI 98 | Single range 50–98 |
+| `D-05` | PyInstaller spec with hard-coded paths; fonts never shipped | Generated spec gone; `--add-data` covers `locales/` and `web/` incl. fonts; `resources.py` resolves them frozen |
+| `D-06` | Changelog claimed 32 icons, there were 37 | Count claim removed; one authored SVG sprite, no maintained number |
+| `D-07` | `PERSISTED_KEYS` dead, advertised a key never written | `save_settings` is driven by it; tests assert only whitelisted keys persist and secrets never do |
+| `D-08` | Seven unused locale keys | Catalog pruned; tests assert every referenced key exists and no orphan exists |
+| `D-09` | README said v0.1.0 while the package was 0.2.0 | README, changelog and `_version.py` agree; the UI version chip is rendered from the version and asserted by a test |
+| `D-10` | No logging, no `--verbose`, no timings | `logging_setup.py`, `--verbose`/`OZEMPDF_LOG`, per-file timings, plus `data/main.log` for shell startup |
+| `D-11` | `argparse` help strings were English literals | Every option, `-h` included, goes through the catalog; a test asserts the localized text and no raw key |
+| `D-12` | `kept_original_guardrail` absent from JSON | Present with `already_optimal`; asserted by tests and the CLI report |
+| `D-13` | Reduced-motion probe called a non-existent Qt API | CSS `prefers-reduced-motion`; every animation disabled under it |
+| `D-14` | Signature flattening on by default, silently invalidating signatures | Off in every preset; enabling it or re-signing requires a consent dialog that states the consequence |
+| `D-15` | Common-password dictionary tried automatically | Only the user-supplied password is tried; empty only when none was supplied. A test proves `"1234"` fails |
+| `D-16` | `/Thumb` images counted as images although the role is metadata | Classified by role first: a page `/Thumb` counts as metadata even when it is an image stream |
+| `D-17` | `/ToUnicode` savings credited without a counter | Separate `cmaps_optimized` counter, `fonts_subsetted` alias preserved |
+| `D-18` | Colliding output paths silently overwrote one another | Collisions get `-2`, `-3` before the extension; tested |
+| `D-19` | No CI, no lint config, no license | `.github/workflows/ci.yml` (three OSes, 3.10/3.14), ruff config, MIT `LICENSE`, `AGENTS.md` |
+| `D-20` | Unused `pdf` parameter threaded through image helpers | Helpers take only the stream they mutate |
+| `D-21` | Language written but never restored | Stored and restored by `AppState` at launch; round-trip test |
+
+### 16.2 Defects found and fixed after the rewrite
+
+These were discovered by rendering real output and by packaging, not by the original ledger.
+
+| Found | Symptom | Fix |
+| --- | --- | --- |
+| Colour space written as a string | Every page rendered blank: `/ColorSpace` was a PDF *string*, not a name | `pikepdf.Name(...)` in `_apply_stream_update`; `/Indexed` built as `Array([Name("/Indexed"), …])`; regression tests decode and count non-white pixels |
+| Strict Lossless quantised gradients | Mean pixel difference 28.6 on a gradient that should be bit-identical | `_exact_palette_candidate` only when ≤ 256 colours exist; otherwise the image is left alone |
+| Inputs opened for writing | `[Errno 13]` on OneDrive placeholders, read-only media and files held by another app | Inputs open read-only; the pipeline never writes to the source; `PermissionError` becomes an actionable message naming the path |
+| Hardcoded version chip | 0.3.3 builds advertised `v0.3.0` | Rendered from `state.version`; `test_static_version_label_matches_package_version` |
+| Enum preset silently ignored | `from_preset(PresetMode.LOSSLESS)` returned Balanced because `str()` of a str-Enum is not its value | Explicit enum branch; `test_from_preset_accepts_an_enum_member` |
+| Sandbox abort before app code | `OzemPDF.exe` never started on the reference Windows 11 host with Electron 45 | Electron pinned to 38.x; startup diagnostics written to `data/main.log` |
+| Installer could not run | NSIS executed the generated installer to extract the uninstaller; the host blocked it | NSIS and portable-exe targets removed; the deliverable is a portable ZIP |
+| Data written outside the app folder | A portable copy still wrote to `%APPDATA%` | `data/` beside the executable; `OZEMPDF_DATA_DIR` for the engine; verified by extraction test |
+
+### 16.3 Known limitations (current)
+
+- **Certificate / public-key encryption** cannot be opened without the private key. Such files are
+  reported as `unsupported`, never guessed at. Owner-restricted files (empty user password) are
+  handled, which covers the common "secured PDF".
+- **Ghostscript is deliberately not a dependency.** It can strip some passwords, but it rewrites
+  content operators and can grow the file, breaking `INV-1` and `INV-2`. Measured: a
+  permission-restricted 5 KB file became a 2.5 KB rewrite; a true open-password file produced a
+  blank page and exit code 0.
+- **Per-file progress only.** A single very large file inside Zopfli shows an indeterminate bar;
+  stage-level progress is future work.
+- **No streaming tiler.** One decoded raster is in memory per image, so hundreds-of-megapixel scans
+  are expensive; `-w 1` bounds the damage.
+- **One shipped locale.** The catalog system is complete and tested, but only `en.json` ships;
+  translating a language is a single JSON file.
+- **No PDF/A or PDF/X conformance check.** The tool preserves what it does not touch, but it does
+  not validate conformance.
+- **No pixel-difference readout.** The inspector shows both renders; it does not compute MSE/PSNR.
+- **No automatic backup** of overwritten originals: overwrite is atomic but not recoverable.
+- **Windows is the verified target.** The ZIP is built and launched here; macOS and Linux builds are
+  configured but not exercised by this project's maintainer, and the ZIP is unsigned (SmartScreen
+  warns on first run).
 
 ---
 
 ## 17. Future work
 
-Prioritised candidates, consistent with the invariants:
+Prioritised, consistent with the invariants:
 
-1. **Observability** (`D-10`) — structured logging and a `--verbose` timing report.
-2. **Signature consent** (`D-14`) — explicit per-run consent plus a clear "no longer signed" note in
-   the output metadata.
-3. **Predictor completion** (`D-02`) — Average/Paeth selection for images where it wins.
-4. **Streaming image pipeline** — decode/encode tiles for very large rasters to bound memory.
-5. **Output collision handling** (`D-18`).
-6. **Locale expansion** — ship at least one non-English catalog to exercise the fallback paths.
-7. **CI** (`D-19`) — matrix test runs plus a frozen-build smoke test per platform.
-8. **Progress granularity** — per-stage progress for very large single files.
-9. **PDF/A preservation mode** — refuse operations that would break conformance.
-10. **Inspector fidelity** — optional pixel-difference overlay and a numeric MSE/PSNR readout,
-    which would make "visually lossless" measurable in-product.
+1. **Stage-level progress** for a single very large file.
+2. **Streaming image pipeline** — decode and encode tiles to bound memory on huge rasters.
+3. **Second locale** shipped to exercise the fallback paths in production rather than in tests.
+4. **Pixel-difference readout** in the inspector (MSE/PSNR), making "visually lossless" measurable
+   in-product.
+5. **Signed builds** for Windows and macOS, so SmartScreen and Gatekeeper stop warning.
+6. **macOS and Linux packaging** verified by CI, including the portable-data behaviour.
+7. **PDF/A preservation mode** that refuses operations which would break conformance.
+8. **Optional backup of overwritten originals**, off by default and documented.
+9. **Fuzz corpus** of malformed PDFs (truncated xref, corrupt JBIG2, zero-page documents) in CI.
 
 ---
 
 ## Appendix A — File inventory
 
+Line counts are indicative (§1.3). `web/fonts/` holds the OFL texts alongside the binaries.
+
 | Path | Lines | Responsibility |
 | --- | --- | --- |
-| `docs/TECHNICAL_SPECIFICATION.md` | 1796 | this specification |
-| `src/ozempdf/_version.py` | 10 | version source of truth |
-| `src/ozempdf/__init__.py` | 21 | public package facade |
-| `src/ozempdf/__main__.py` | 23 | entry point, `freeze_support` |
-| `src/ozempdf/config.py` | 181 | enums, `CompressionConfig`, presets |
-| `src/ozempdf/i18n.py` | 268 | JSON catalog manager, `t()` |
-| `src/ozempdf/cli.py` | 298 | argparse, config mapping, run loop, JSON report |
-| `src/ozempdf/engine/__init__.py` | 67 | engine facade |
-| `src/ozempdf/engine/pipeline.py` | 284 | 6-stage orchestration, save, guardrail |
-| `src/ozempdf/engine/unlock.py` | 260 | decryption, signature flattening |
-| `src/ozempdf/engine/analyzer.py` | 367 | byte audit, CTM/DPI analysis |
-| `src/ozempdf/engine/deduplicator.py` | 205 | SHA-256 resource dedup |
-| `src/ozempdf/engine/image_optimizer.py` | 989 | image modes A/B, JPEG stripping, predictor |
-| `src/ozempdf/engine/font_optimizer.py` | 261 | font subsetting, CMap recompression |
-| `src/ozempdf/engine/stream_optimizer.py` | 173 | bloat stripping, Zopfli streams |
-| `src/ozempdf/engine/batch.py` | 387 | discovery, mapping, thumbnails, parallel run |
-| `src/ozempdf/gui/__init__.py` | 47 | `launch_gui` |
-| `src/ozempdf/gui/main_window.py` | 2556 | window, steps, presets, dock, state machine |
-| `src/ozempdf/gui/theme.py` | 543 | palettes + QSS |
-| `src/ozempdf/gui/icons.py` | 196 | 37 SVG icons, renderers |
-| `src/ozempdf/gui/fonts.py` | 75 | bundled font registration |
-| `src/ozempdf/gui/settings.py` | 81 | JSON settings store |
-| `src/ozempdf/gui/worker.py` | 115 | thumbnail + batch threads |
-| `src/ozempdf/gui/breakdown_widget.py` | 364 | animated savings breakdown |
-| `src/ozempdf/gui/preview_dialog.py` | 807 | wipe-slider inspector |
-| `src/ozempdf/locales/en.json` | 219 | English catalog, 13 groups |
-| `src/ozempdf/resources/fonts/` | 9 TTF + 2 OFL | bundled Inter / JetBrains Mono |
-| `tests/generate_test_pdfs.py` | 447 | synthetic PDF fixtures |
-| `tests/test_lossless.py` | 106 | Mode A tests |
-| `tests/test_visually_lossless.py` | 86 | DPI + Mode B tests |
-| `tests/test_security_and_fonts.py` | 55 | unlock/signature/font test |
-| `tests/test_batch.py` | 105 | batch, thumbnails, CLI, i18n |
-| `tests/test_gui.py` | 117 | headless GUI tests |
-| `pyproject.toml` | 59 | packaging |
-| `build_cross_platform.py` | 150 | PyInstaller driver |
-| `build_windows.bat` | 51 | Windows build wrapper |
-| `OzemPDF.spec` | 54 | generated PyInstaller spec (stale paths) |
-| `README.md` / `CHANGELOG.md` / `AGENTS.md` | 148 / 79 / 25 | product docs, history, agent rules |
+| `docs/TECHNICAL_SPECIFICATION.md` | 1981 | this specification |
+| `docs/USER_STORIES.md` | 957 | personas, epics, stories, traceability |
+| `docs/DISCREPANCIES.md` | 101 | the D-01…D-21 resolution ledger with evidence |
+| `docs/screenshots/step1.png` … `step3.png`, `inspector.png` | — | README figures, captured from the shipped UI |
+| `src/ozempdf/_version.py` | 3 | version source of truth (`0.3.3`) |
+| `src/ozempdf/__init__.py` | 3 | package facade |
+| `src/ozempdf/__main__.py` | 11 | entry point, `freeze_support` |
+| `src/ozempdf/config.py` | 203 | enums, `CompressionConfig`, presets, clamping |
+| `src/ozempdf/i18n.py` | 195 | JSON catalog manager, `t()` |
+| `src/ozempdf/cli.py` | 259 | argparse, config mapping, run loop, JSON report, exit codes |
+| `src/ozempdf/gui.py` | 20 | `launch_gui`: start the local server and open the browser |
+| `src/ozempdf/server.py` | 933 | loopback HTTP API, static files, `AppState`, run thread, thumbnail pool |
+| `src/ozempdf/settings.py` | 127 | portable/system data locations, whitelisted persistence |
+| `src/ozempdf/logging_setup.py` | 35 | `--verbose` / `OZEMPDF_LOG` |
+| `src/ozempdf/formatting.py` | 27 | byte and percent formatting |
+| `src/ozempdf/resources.py` | 20 | `resource_path` honouring `sys._MEIPASS` |
+| `src/ozempdf/engine/__init__.py` | 77 | engine facade |
+| `src/ozempdf/engine/pipeline.py` | 306 | 7-stage orchestration, save, guardrail, promote |
+| `src/ozempdf/engine/unlock.py` | 545 | read-only open, protection classification, signature flattening |
+| `src/ozempdf/engine/analyzer.py` | 685 | byte audit, CTM/DPI analysis |
+| `src/ozempdf/engine/deduplicator.py` | 637 | SHA-256 resource dedup, opaque `/SMask` removal |
+| `src/ozempdf/engine/image_optimizer.py` | 744 | image modes A/B, classification, JPEG stripping, predictor |
+| `src/ozempdf/engine/font_optimizer.py` | 628 | font subsetting, CMap recompression |
+| `src/ozempdf/engine/stream_optimizer.py` | 240 | bloat stripping, Zopfli streams |
+| `src/ozempdf/engine/signing.py` | 92 | PKCS#12 re-signing, timestamps |
+| `src/ozempdf/engine/batch.py` | 396 | discovery, mapping, collision indexing, rendering, pool |
+| `src/ozempdf/web/index.html` | 477 | interface markup, inline SVG sprite, dialogs |
+| `src/ozempdf/web/styles.css` | 2582 | tokens, layout, components, responsive rules, reduced motion |
+| `src/ozempdf/web/app.js` | 1892 | state, rendering, API calls, inspector, shortcuts |
+| `src/ozempdf/web/fonts/` | — | IBM Plex Sans (latin, latin-ext) and JetBrains Mono `woff2` + OFL texts |
+| `src/ozempdf/locales/en.json` | 322 | English catalog: 19 groups, 282 strings |
+| `app/main.js` | 368 | Electron main: engine spawn, ready handshake, native pickers, close guard, portable data |
+| `app/preload.js` | 23 | the four bridged capabilities, `contextIsolation` |
+| `app/package.json` | 74 | Electron 38 dependency, `electron-builder` zip configuration |
+| `app/launcher/Start OzemPDF (compatibility).cmd` | 6 | `--no-sandbox` host workaround |
+| `app/launcher/Start OzemPDF in browser.cmd` | 12 | browser-only launcher |
+| `app/build/icon.ico`, `icon.png` | — | generated by `scripts/make_icon.py` |
+| `scripts/engine_entry.py` | 4 | frozen engine entry point |
+| `scripts/make_icon.py` | 66 | icon generator (accent tile + document mark) |
+| `build_cross_platform.py` | 135 | PyInstaller driver (one-dir engine) |
+| `tests/conftest.py` | 111 | fixtures and pixel helpers |
+| `tests/pdf_fixtures.py` | 337 | synthetic PDF builders |
+| `tests/test_lossless.py` | 110 | Mode A and guardrail |
+| `tests/test_visually_lossless.py` | 131 | DPI, Mode B, predictor |
+| `tests/test_security_and_fonts.py` | 288 | protection, signatures, fonts |
+| `tests/test_batch.py` | 228 | discovery, mapping, pool, CLI |
+| `tests/test_settings.py` | 113 | persistence, data dir, presets |
+| `tests/test_i18n.py` | 97 | catalogs and key coverage |
+| `tests/test_web.py` | 336 | HTTP API and interface contract |
+| `pyproject.toml` | 55 | packaging, pytest, ruff |
+| `README.md` / `CHANGELOG.md` / `AGENTS.md` | 243 / 165 / 80 | product docs, history, agent rules |
+| `DESIGN.md` / `PRODUCT.md` | 98 / 55 | design contract, product definition |
+| `LICENSE` | — | MIT |
+| `.github/workflows/ci.yml` | — | pytest (three OSes × 3.10/3.14), ruff, `node --check` |
 
 ## Appendix B — JSON schemas
 
@@ -1695,8 +1822,6 @@ Prioritised candidates, consistent with the invariants:
   "page_count": 0,
   "original_bytes": 0,
   "compressed_bytes": 0,
-  "bytes_saved": 0,
-  "reduction_percent": 0.0,
   "before_breakdown": {
     "images_bytes": 0,
     "fonts_bytes": 0,
@@ -1708,14 +1833,27 @@ Prioritised candidates, consistent with the invariants:
   "images_inspected": 0,
   "images_optimized": 0,
   "opaque_smasks_stripped": 0,
+  "images_downsampled": 0,
+  "images_indexed": 0,
   "duplicate_images_merged": 0,
-  "fonts_optimized": 0,
+  "font_streams_optimized": 0,
+  "cmaps_optimized": 0,
   "signatures_flattened": 0,
+  "was_encrypted": false,
+  "protection_kind": "none",
+  "protection_removed": false,
+  "required_password": false,
+  "kept_original_guardrail": false,
+  "already_optimal": false,
+  "signed": false,
+  "output_mode": "suffix",
   "elapsed_seconds": 0.0
 }
 ```
 
-Rounding: `reduction_percent` to 2 decimals, `elapsed_seconds` to 3.
+`protection_kind` is one of `none`, `permissions`, `password`, `unsupported`. Rounding:
+`reduction_percent` to 2 decimals, `elapsed_seconds` to 3. New fields are additive: consumers must
+ignore keys they do not know.
 
 ### B.2 `BatchSummary`
 
@@ -1724,6 +1862,7 @@ Rounding: `reduction_percent` to 2 decimals, `elapsed_seconds` to 3.
   "total_files": 0,
   "succeeded_count": 0,
   "failed_count": 0,
+  "protection_removed_count": 0,
   "total_original_bytes": 0,
   "total_compressed_bytes": 0,
   "total_bytes_saved": 0,
@@ -1735,7 +1874,7 @@ Rounding: `reduction_percent` to 2 decimals, `elapsed_seconds` to 3.
 }
 ```
 
-### B.3 GUI settings file
+### B.3 Settings file
 
 ```json
 {
@@ -1747,19 +1886,42 @@ Rounding: `reduction_percent` to 2 decimals, `elapsed_seconds` to 3.
     "output_mode": "suffix",
     "output_suffix": "_compressed",
     "output_dir": "",
-    "target_dpi": 150,
+    "strict_lossless": false,
     "enable_downsampling": true,
+    "target_dpi": 150,
     "jpeg_quality": 85,
     "quantize_ui_screenshots": true,
+    "ui_palette_colors": 256,
     "zopfli_iterations": 15,
     "strip_opaque_smask": true,
     "deduplicate_resources": true,
     "use_object_streams": true,
     "subset_fonts": true,
     "strip_bloat": true,
-    "unlock_and_flatten_signatures": true,
-    "strip_metadata": false
+    "unlock_and_flatten_signatures": false,
+    "strip_metadata": false,
+    "sign_after_slimming": false,
+    "sign_field_name": "OzemPDF Signature",
+    "sign_reason": "Slimmed with OzemPDF",
+    "max_workers": 0
   }
+}
+```
+
+`PERSISTED_KEYS` is `dark_mode`, `language`, `preset`, `advanced_open`, `config`. Passwords
+(`password`, `sign_pkcs12_password`), the certificate path and the TSA URL are never written.
+
+### B.4 `/api/bootstrap`
+
+```json
+{
+  "version": "0.3.3",
+  "language": "en",
+  "languages": [ { "code": "en", "name": "English", "native_name": "English" } ],
+  "presets": [ { "id": "lossless", "name": "Strict Lossless", "description": "…" } ],
+  "config": { "…": "CompressionConfig.to_dict(), secrets omitted" },
+  "queue": [ { "id": 1, "path": "…", "status": "queued", "protection_kind": "none" } ],
+  "reduced_motion": false
 }
 ```
 
@@ -1768,19 +1930,27 @@ Rounding: `reduction_percent` to 2 decimals, `elapsed_seconds` to 3.
 | Group | Purpose | Representative keys |
 | --- | --- | --- |
 | `_meta` | catalog metadata | `code`, `name`, `native_name` |
-| `app` | product identity | `name`, `window_title` |
-| `header` | stepper + theme/language controls | `step1..3`, `theme_tip`, `tip_step1..3` |
-| `menu` | Help menu + About + shortcut reference | `about*`, `shortcuts*`, `sc_*` |
-| `confirm` | destructive-action confirmation | `overwrite_title`, `overwrite_body` |
-| `step1` | drop zone | `drop_title`, `btn_select_files` |
-| `step2` | queue, columns, statuses, row actions | `queued_heading`, `col_*`, `status_*`, `btn_*` |
-| `presets` | compression mode card | `lossless_name/desc`, `balanced_*`, `max_*`, `custom_desc` |
-| `advanced` | drawer sections + tooltips | `sec1..3_title`, `tip_*` |
-| `output` | destination popover | `label`, `suffix_*`, `folder_*`, `overwrite_*` |
-| `footer` | action dock | `btn_slim_*`, `btn_open_output`, `btn_stop*` |
-| `step3` | banner + breakdown | `banner_*`, `cat_*`, `breakdown_*` |
-| `inspector` | wipe-slider dialog | `badge*`, `subtitle_*`, `tip_*` |
-| `cli` | terminal copy | `description`, `file_ok`, `summary_*` |
+| `app` | product identity | `name`, `tagline`, `window_title` |
+| `header` | brand, version chip, stepper, theme/language/help | `step1..3`, `theme_tip`, `version` |
+| `step1` | drop mat | `title`, `subtitle`, `btn_files`, `btn_folder` |
+| `step2` | queue, columns, statuses, row actions | `queue_heading`, `col_*`, `status_*`, `btn_*` |
+| `mode` | compression-mode card | `title`, `lossless_name/desc`, `balanced_*`, `max_*`, `custom_desc` |
+| `advanced` | drawer sections and tooltips | `sec1..3_title`, `tip_*`, signing labels |
+| `output` | destination dialog | `dialog_title`, `same_folder`, `custom_folder`, `overwrite_*`, `suffix_*` |
+| `footer` | action dock | `save_to`, `btn_slim_one/many`, `btn_stop`, `btn_open_output` |
+| `step3` | results band and breakdown | `smaller`, `band_notes_*` (incl. `unlocked_one/many`), `cat_*`, `breakdown_*` |
+| `inspector` | wipe-slider inspector | `badge_compare`, `badge_preview`, `subtitle_*`, `zoom_*`, `tip_*` |
+| `dialogs` | generic dialog actions | `cancel`, `close`, `done`, `apply` |
+| `picker` | folder picker | `title`, `up`, `empty`, `select` |
+| `confirm` | destructive-action confirmation | `overwrite_title/body`, `quit_title/body/button` |
+| `password` | open-password prompt | `title`, `body`, `btn_run`, `error` |
+| `help` | help dialog and shortcut table | `title`, `sc_*`, `title_about` |
+| `notices` | toasts and skipped-file reasons | `skipped_*`, `dedupe_*`, `permissions_tip` |
+| `errors` | error messages surfaced in the UI | `permission_denied`, `protection_unsupported`, `generic` |
+| `cli` | terminal copy | `description`, `epilog`, `help_*`, `file_ok`, `summary_*`, `unlocked_one` |
+
+Key coverage is tested in both directions: every key referenced by Python or the HTML/JS exists in
+`en.json`, and `en.json` contains no key nobody references (D-08).
 
 ## Appendix D — Glossary
 
@@ -1795,12 +1965,17 @@ Rounding: `reduction_percent` to 2 decimals, `elapsed_seconds` to 3.
 | **Predictor 15** | PDF `/DecodeParms` option that applies PNG row filters before deflate, improving ratios on raster data. |
 | **`/Indexed`** | Palette colour space: 1 byte per pixel plus a lookup table string. |
 | **`/PieceInfo`** | Application-private data (Illustrator/InDesign/Office) embedded in a PDF; usually megabytes of non-rendering bloat. |
-| **`/Thumb`** | Embedded page thumbnail image. |
+| **`/Thumb`** | Embedded page thumbnail image; metadata by role, even when it is an image stream. |
 | **`/ObjStm`** | PDF 1.5+ object stream: packs non-stream objects into a compressed stream. |
 | **`/Sig`, `/Perms`** | Signature dictionary and DocMDP/UR3 permission block; removed when flattening. |
+| **byte-range signature** | A signature covering a declared byte range of the file; any change to those bytes invalidates it, which is why compression requires flattening or re-signing. |
 | **Zopfli** | Google's deflate encoder producing 3–8 % smaller output than zlib at high CPU cost. |
 | **GID** | Glyph ID inside an embedded font; content streams may reference glyphs by GID. |
 | **`retain_gids`** | fontTools subset option that preserves original glyph numbering. |
 | **Never-grow guardrail** | The project rule that no output (image stream or whole file) may be larger than its input. |
-| **Progressive disclosure** | The 3-step GUI model: show only what the current stage needs. |
-| **Smart Incremental Queue** | Adding files while in Step 3 queues only the new ones, leaving completed results on screen. |
+| **Progressive disclosure** | The 3-step model: show only what the current stage needs. |
+| **Smart incremental queue** | Adding files while in Step 3 queues only the new ones, leaving completed results on screen. |
+| **Loopback token** | The random per-session secret the local server requires on `/api/*`, set as a cookie on first navigation. |
+| **Portable data directory** | `data/` beside the executable; the only place a packaged build writes. |
+| **Wipe slider** | The inspector control that reveals the original on one side and the slimmed page on the other. |
+| **Consent dialog** | The confirmation that must precede an action changing a document's legal state (flattening, re-signing, overwriting). |

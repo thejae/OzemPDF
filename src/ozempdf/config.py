@@ -87,10 +87,16 @@ class CompressionConfig:
         ``custom`` has no stored definition; it resolves to the balanced branch
         and is only ever produced by editing a knob at runtime.
         """
-        try:
-            mode = PresetMode(str(preset))
-        except ValueError:
-            mode = PresetMode.BALANCED
+        if isinstance(preset, PresetMode):
+            # ``str(PresetMode.LOSSLESS)`` is "PresetMode.LOSSLESS" on Python 3.11+,
+            # so an enum argument must not go through str() (it silently fell back
+            # to Balanced, which is not what a typed caller asked for).
+            mode = preset
+        else:
+            try:
+                mode = PresetMode(str(preset))
+            except ValueError:
+                mode = PresetMode.BALANCED
         if mode is PresetMode.LOSSLESS:
             return cls(
                 preset=mode,

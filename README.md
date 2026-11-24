@@ -234,8 +234,11 @@ PRODUCT.md / DESIGN.md  product truth and the design system
   Electron shell can).
 - PDF/A and PDF/X conformance are not validated.
 
-The full list of discrepancies from the previous PySide6 architecture, and how each was resolved
-here, is in [`docs/DISCREPANCIES.md`](docs/DISCREPANCIES.md).
+Three documents describe the project in depth: [`docs/TECHNICAL_SPECIFICATION.md`](docs/TECHNICAL_SPECIFICATION.md)
+(the current-state specification of the engine, CLI, API and interface),
+[`docs/USER_STORIES.md`](docs/USER_STORIES.md) (personas, epics, acceptance criteria, traceability) and
+[`docs/DISCREPANCIES.md`](docs/DISCREPANCIES.md) (every defect from the previous PySide6 architecture,
+how it was resolved, and what the rebuild introduced).
 
 ## License
 

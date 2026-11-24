@@ -95,3 +95,19 @@ def test_language_is_persisted_and_restored(
     assert i18n.current_language() == "fr"
     state.thumbnail_pool.shutdown(wait=False)
     i18n.set_language("en")
+
+
+def test_from_preset_accepts_an_enum_member() -> None:
+    """A typed caller must not silently get Balanced.
+
+    ``str(PresetMode.LOSSLESS)`` is "PresetMode.LOSSLESS" on Python 3.11+, so the
+    old ``PresetMode(str(preset))`` lookup raised ValueError and fell back to
+    Balanced, quietly ignoring the enum the signature advertises.
+    """
+    from ozempdf.config import CompressionConfig, PresetMode
+
+    for member in (PresetMode.LOSSLESS, PresetMode.BALANCED, PresetMode.MAX_SLIM):
+        assert CompressionConfig.from_preset(member).preset is member
+
+    assert CompressionConfig.from_preset(PresetMode.LOSSLESS).strict_lossless is True
+    assert CompressionConfig.from_preset(PresetMode.MAX_SLIM).target_dpi == 110
