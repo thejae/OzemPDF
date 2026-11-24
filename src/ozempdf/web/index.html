@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>OzemPDF</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-logo" viewBox="0 0 24 24">
+      <path d="M6 2.75h7.5L18 7.25V21.25H6z"/>
+      <path d="M13.5 2.75v4.5H18"/>
+      <path d="M9.25 12.5h5.5"/>
+      <path d="M12 10.25v4.5"/>
+      <path d="M9.75 17.75h4.5"/>
+    </symbol>
+    <symbol id="i-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.6l2 2.5h7.4a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="M3.5 8.5V6.75a1.5 1.5 0 0 1 1.5-1.5h4l2 2.25h6.25a1.5 1.5 0 0 1 1.5 1.5v1.5"/><path d="M3.5 9.5h17l-2 9.5H5.5z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6.5 2.75h7L18 7.25v14H6.5z"/><path d="M13 2.75V7.5h4.5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c4.5 5 4.5 12 0 17M12 3.5c-4.5 5-4.5 12 0 17"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.2c-.8.5-1.2 1-1.2 2"/><path d="M12 17.1h.01"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+    <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5 10-11"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5L21.5 20h-19z"/><path d="M12 9v5.5"/><path d="M12 17.6h.01"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="10" rx="2"/><path d="M8.5 10.5V7.5a3.5 3.5 0 1 1 7 0v3"/></symbol>
+    <symbol id="i-lock-open" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="10" rx="2"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 6.7-1.4"/></symbol>
+    <symbol id="i-inspect" viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.3-5.4"/><path d="M4 4.5V9h4.5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 6.5h15"/><path d="M9 6.5V4.5h6v2"/><path d="M6.5 6.5l1 14h9l1-14"/><path d="M10 10.5v6M14 10.5v6"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10"/><path d="M19.5 4.5l-8 8"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18.5v-10A1.5 1.5 0 0 1 6.5 7H11"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4.5 4.5v5h5"/><path d="M4.9 9.3A8 8 0 1 1 4 13.5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4.5 20.5h15"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/></symbol>
+  </svg>
+
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark"><svg><use href="#i-logo"/></svg></span>
+      <span class="brand-name">OzemPDF</span>
+      <span class="brand-version" id="versionLabel">v0.3.0</span>
+    </div>
+
+    <nav class="stepper" id="stepper" aria-label="Steps">
+      <button class="step" data-step="1" type="button">
+        <span class="step-num">1</span><span class="step-label" data-i18n="header.step1"></span>
+      </button>
+      <span class="step-rule" aria-hidden="true"></span>
+      <button class="step" data-step="2" type="button">
+        <span class="step-num">2</span><span class="step-label" data-i18n="header.step2"></span>
+      </button>
+      <span class="step-rule" aria-hidden="true"></span>
+      <button class="step" data-step="3" type="button">
+        <span class="step-num">3</span><span class="step-label" data-i18n="header.step3"></span>
+      </button>
+    </nav>
+
+    <div class="header-controls">
+      <button class="icon-btn lang-btn" id="langBtn" type="button" aria-haspopup="menu" aria-expanded="false" data-i18n-title="header.language_tip" data-i18n-aria="header.language_tip">
+        <svg><use href="#i-globe"/></svg><span id="langCode">EN</span>
+      </button>
+      <div class="menu" id="langMenu" role="menu" hidden></div>
+      <button class="icon-btn" id="themeBtn" type="button" data-i18n-title="header.theme_tip">
+        <svg><use href="#i-sun" id="themeIcon"/></svg>
+      </button>
+      <button class="icon-btn" id="helpBtn" type="button" data-i18n-title="header.help_tip" data-i18n-aria="header.help_tip">
+        <svg><use href="#i-help"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Step 1 -->
+    <section class="step-panel step-one" id="stepOne" aria-labelledby="stepOneTitle">
+      <div class="drop-mat" id="dropMat">
+        <span class="drop-icon"><svg><use href="#i-logo"/></svg></span>
+        <h1 id="stepOneTitle" data-i18n="step1.title"></h1>
+        <p class="drop-sub" data-i18n="step1.subtitle"></p>
+        <div class="drop-actions">
+          <button class="btn primary" id="btnPickFiles" type="button">
+            <svg><use href="#i-add"/></svg><span data-i18n="step1.btn_files"></span>
+          </button>
+          <button class="btn" id="btnPickFolder" type="button">
+            <svg><use href="#i-folder"/></svg><span data-i18n="step1.btn_folder"></span>
+          </button>
+        </div>
+        <p class="drop-facts">
+          <span data-i18n="step1.fact_offline"></span><span class="dot" aria-hidden="true">·</span>
+          <span data-i18n="step1.fact_vectors"></span><span class="dot" aria-hidden="true">·</span>
+          <span data-i18n="step1.fact_never_grow"></span>
+        </p>
+        <p class="drop-hint" data-i18n="step1.drop_hint"></p>
+      </div>
+    </section>
+
+    <!-- Step 2 -->
+    <section class="step-panel" id="stepTwo" aria-labelledby="queueTitle" hidden>
+      <div class="section-head">
+        <div class="section-title">
+          <h2 id="queueTitle" data-i18n="step2.queue_heading"></h2>
+          <p class="meta" id="queueSummary"></p>
+        </div>
+        <div class="section-actions">
+          <button class="btn sm" id="btnAddFiles" type="button">
+            <svg><use href="#i-add"/></svg><span data-i18n="step2.btn_add_files"></span>
+          </button>
+          <button class="btn sm" id="btnAddFolder" type="button">
+            <svg><use href="#i-folder"/></svg><span data-i18n="step2.btn_add_folder"></span>
+          </button>
+          <button class="btn ghost sm" id="btnClear" type="button" data-i18n="step2.btn_clear"></button>
+        </div>
+      </div>
+
+      <div class="queue-panel" id="queuePanel">
+        <table class="queue-table">
+          <thead>
+            <tr>
+              <th class="c-doc" scope="col" data-i18n="step2.col_document"></th>
+              <th class="c-pages" scope="col" data-i18n="step2.col_pages"></th>
+              <th class="c-size" scope="col" data-i18n="step2.col_original"></th>
+              <th class="c-status" scope="col" data-i18n="step2.col_status"></th>
+              <th class="c-savings" scope="col" data-i18n="step2.col_savings"></th>
+              <th class="c-action" scope="col" data-i18n="step2.col_action"></th>
+            </tr>
+          </thead>
+          <tbody id="queueBody"></tbody>
+        </table>
+        <div class="empty-state" id="queueEmpty" hidden>
+          <p class="empty-title" data-i18n="step2.empty_title"></p>
+          <p class="empty-body" data-i18n="step2.empty_body"></p>
+        </div>
+      </div>
+
+      <section class="mode-card" id="modeCard" aria-labelledby="modeTitle">
+        <div class="mode-head">
+          <div class="mode-copy">
+            <h3 id="modeTitle" data-i18n="mode.title"></h3>
+            <p class="mode-desc" id="modeDesc"></p>
+          </div>
+          <div class="mode-tools">
+            <div class="segmented" id="presetGroup" role="group" aria-label="Compression mode">
+              <button type="button" data-preset="lossless" data-i18n="mode.lossless_name"></button>
+              <button type="button" data-preset="balanced" data-i18n="mode.balanced_name"></button>
+              <button type="button" data-preset="max" data-i18n="mode.max_name"></button>
+            </div>
+            <button class="btn ghost sm" id="btnReset" type="button" data-i18n="mode.btn_reset"></button>
+            <button class="btn sm" id="btnAdvanced" type="button" aria-expanded="false" aria-controls="advancedDrawer">
+              <span data-i18n="mode.advanced"></span>
+              <svg class="chev"><use href="#i-chevron-down"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="drawer" id="advancedDrawer" hidden>
+          <div class="drawer-inner">
+            <div class="drawer-grid">
+              <fieldset class="drawer-card">
+                <legend data-i18n="advanced.images_title"></legend>
+                <div class="knob">
+                  <label for="dpiRange" class="knob-label"><span data-i18n="advanced.dpi_label"></span><output id="dpiValue" class="mono"></output></label>
+                  <input type="range" id="dpiRange" min="72" max="600" step="1" value="150">
+                  <p class="knob-hint" id="dpiHint"></p>
+                </div>
+                <div class="knob">
+                  <label for="jpegRange" class="knob-label"><span data-i18n="advanced.jpeg_label"></span><output id="jpegValue" class="mono"></output></label>
+                  <input type="range" id="jpegRange" min="50" max="98" step="1" value="85">
+                  <p class="knob-hint" data-i18n="advanced.jpeg_hint"></p>
+                </div>
+                <label class="check"><input type="checkbox" id="chkPalette"><span data-i18n="advanced.palette_label"></span></label>
+              </fieldset>
+
+              <fieldset class="drawer-card">
+                <legend data-i18n="advanced.streams_title"></legend>
+                <div class="knob">
+                  <label for="zopfliRange" class="knob-label"><span data-i18n="advanced.zopfli_label"></span><output id="zopfliValue" class="mono"></output></label>
+                  <input type="range" id="zopfliRange" min="5" max="50" step="1" value="15">
+                  <p class="knob-hint" data-i18n="advanced.zopfli_hint"></p>
+                </div>
+                <label class="check"><input type="checkbox" id="chkSmask"><span data-i18n="advanced.smask_label"></span></label>
+                <label class="check"><input type="checkbox" id="chkDedup"><span data-i18n="advanced.dedup_label"></span></label>
+                <label class="check"><input type="checkbox" id="chkObjStm"><span data-i18n="advanced.objstm_label"></span></label>
+              </fieldset>
+
+              <fieldset class="drawer-card">
+                <legend data-i18n="advanced.fonts_title"></legend>
+                <label class="check"><input type="checkbox" id="chkFonts"><span data-i18n="advanced.fonts_label"></span></label>
+                <label class="check"><input type="checkbox" id="chkBloat"><span data-i18n="advanced.bloat_label"></span></label>
+                <label class="check"><input type="checkbox" id="chkMeta"><span data-i18n="advanced.meta_label"></span></label>
+                <label class="check"><input type="checkbox" id="chkFlatten"><span data-i18n="advanced.flatten_label"></span></label>
+                <div class="sign-block">
+                  <label class="check"><input type="checkbox" id="chkSign"><span data-i18n="advanced.sign_label"></span></label>
+                  <p class="knob-hint" id="signingNote" data-i18n="advanced.signing_note" hidden></p>
+                  <div class="sign-fields" id="signFields" hidden>
+                    <div class="input-row">
+                      <input class="mono" id="certPath" type="text" readonly data-i18n-placeholder="advanced.cert_placeholder">
+                      <button class="btn sm" id="btnPickCert" type="button" data-i18n="advanced.cert_choose"></button>
+                    </div>
+                    <input class="mono" id="certPassword" type="password" autocomplete="off" data-i18n-placeholder="advanced.cert_password">
+                    <input id="signReason" type="text" maxlength="120" data-i18n-placeholder="advanced.sign_reason">
+                  </div>
+                </div>
+              </fieldset>
+            </div>
+
+            <div class="drawer-foot">
+              <label class="field inline" for="docPassword">
+                <span data-i18n="advanced.password_label"></span>
+                <input class="mono" id="docPassword" type="password" autocomplete="off" spellcheck="false">
+                <small data-i18n="advanced.password_hint"></small>
+              </label>
+              <p class="warn-line" id="signWarn" hidden><svg><use href="#i-alert"/></svg><span data-i18n="advanced.warning_invalidate"></span></p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- Step 3 -->
+    <section class="step-panel" id="stepThree" aria-labelledby="resultsTitle" hidden>
+      <div class="results-band" id="resultsBand">
+        <div class="band-main">
+          <p class="band-label" id="bandLabel" data-i18n="step3.band_label"></p>
+          <p class="band-number" id="resultsTitle"><span id="bandPercent">—</span><span class="band-unit" data-i18n="step3.smaller"></span></p>
+        </div>
+        <div class="band-meta">
+          <p class="band-saved" id="bandSaved"></p>
+          <p class="meta" id="bandSub"></p>
+          <p class="meta band-notes" id="bandNotes"></p>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title">
+          <h2 id="resultsQueueTitle" data-i18n="step3.results_heading"></h2>
+          <p class="meta" id="resultsQueueSummary"></p>
+        </div>
+        <div class="section-actions">
+          <button class="btn sm" id="btnResultsAddFiles" type="button">
+            <svg><use href="#i-add"/></svg><span data-i18n="step2.btn_add_files"></span>
+          </button>
+          <button class="btn ghost sm" id="btnResultsAddFolder" type="button">
+            <svg><use href="#i-folder"/></svg><span data-i18n="step2.btn_add_folder"></span>
+          </button>
+        </div>
+      </div>
+      <div id="resultsQueueSlot"></div>
+
+      <section class="breakdown" id="breakdownCard" aria-labelledby="breakdownTitle">
+        <div class="breakdown-head">
+          <div>
+            <h3 id="breakdownTitle" data-i18n="step3.breakdown_title"></h3>
+            <p class="meta" id="breakdownSub"></p>
+            <p class="meta" data-i18n="step3.breakdown_note"></p>
+          </div>
+          <button class="btn ghost sm" id="btnShowTotal" type="button" data-i18n="step3.show_total" hidden></button>
+        </div>
+        <div class="breakdown-rows" id="breakdownRows"></div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="dock">
+    <div class="dock-output" id="dockOutput">
+      <span class="dock-label" data-i18n="output.label"></span>
+      <button class="output-btn" id="btnOutput" type="button" aria-haspopup="dialog">
+        <span id="outputLabel"></span><svg class="chev"><use href="#i-chevron-up"/></svg>
+      </button>
+      <span class="suffix-wrap" id="suffixWrap">
+        <input id="suffixInput" class="mono" aria-label="Suffix" spellcheck="false" value="_compressed">
+        <span class="suffix-ext mono">.pdf</span>
+      </span>
+    </div>
+    <button class="btn ghost" id="btnNewBatch" type="button" data-i18n="footer.new_batch" hidden></button>
+    <div class="dock-spacer"></div>
+    <button class="btn" id="btnOpenOutput" type="button">
+      <svg><use href="#i-folder-open"/></svg><span data-i18n="footer.open_output"></span>
+    </button>
+    <button class="btn danger-ghost" id="btnStop" type="button" hidden>
+      <svg><use href="#i-stop"/></svg><span data-i18n="footer.stop"></span>
+    </button>
+    <button class="btn primary lg" id="btnRun" type="button" disabled></button>
+  </footer>
+
+  <dialog class="sheet" id="outputDialog" aria-labelledby="outputTitle">
+    <div class="sheet-head">
+      <h2 id="outputTitle" data-i18n="output.dialog_title"></h2>
+      <button class="icon-btn" type="button" data-close-dialog="outputDialog" data-i18n-aria="dialogs.close"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="output-options">
+      <button class="output-option" type="button" data-output-mode="suffix">
+        <span class="option-icon"><svg><use href="#i-file"/></svg></span>
+        <span class="option-copy"><strong data-i18n="output.suffix_title"></strong><small data-i18n="output.suffix_body"></small></span>
+        <svg class="option-check"><use href="#i-check"/></svg>
+      </button>
+      <button class="output-option" type="button" data-output-mode="folder">
+        <span class="option-icon"><svg><use href="#i-folder-open"/></svg></span>
+        <span class="option-copy"><strong data-i18n="output.folder_title"></strong><small id="folderOptionBody" data-i18n="output.folder_body"></small></span>
+        <svg class="option-check"><use href="#i-check"/></svg>
+      </button>
+      <button class="output-option" type="button" data-output-mode="overwrite">
+        <span class="option-icon"><svg><use href="#i-scan"/></svg></span>
+        <span class="option-copy"><strong data-i18n="output.overwrite_title"></strong><small data-i18n="output.overwrite_body"></small></span>
+        <span class="atomic-badge mono" data-i18n="output.atomic"></span>
+        <svg class="option-check"><use href="#i-check"/></svg>
+      </button>
+    </div>
+    <p class="sheet-note" data-i18n="output.note"></p>
+    <div class="sheet-foot">
+      <button class="btn" type="button" data-close-dialog="outputDialog" data-i18n="dialogs.cancel"></button>
+      <button class="btn primary" type="button" id="btnOutputDone" data-i18n="dialogs.done"></button>
+    </div>
+  </dialog>
+
+  <dialog class="sheet picker" id="pickerDialog" aria-labelledby="pickerTitle">
+    <div class="sheet-head">
+      <h2 id="pickerTitle" data-i18n="picker.title_files"></h2>
+      <button class="icon-btn" type="button" data-close-dialog="pickerDialog" data-i18n-aria="dialogs.close"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="picker-bar">
+      <button class="icon-btn" id="pickerUp" type="button" data-i18n-aria="picker.up" data-i18n-title="picker.up"><svg><use href="#i-chevron-up"/></svg></button>
+      <div class="picker-path mono" id="pickerPath"></div>
+      <div class="picker-roots" id="pickerRoots"></div>
+    </div>
+    <div class="picker-list" id="pickerList" role="listbox" aria-multiselectable="true"></div>
+    <p class="sheet-note" id="pickerHint" data-i18n="picker.hint_files"></p>
+    <div class="sheet-foot">
+      <span class="picker-count mono" id="pickerCount"></span>
+      <div class="foot-spacer"></div>
+      <button class="btn" type="button" data-close-dialog="pickerDialog" data-i18n="dialogs.cancel"></button>
+      <button class="btn primary" type="button" id="pickerConfirm" data-i18n="picker.select_files" disabled></button>
+    </div>
+  </dialog>
+
+  <dialog class="sheet small" id="overwriteDialog" aria-labelledby="overwriteTitle">
+    <div class="sheet-head">
+      <h2 id="overwriteTitle" data-i18n="confirm.overwrite_title"></h2>
+    </div>
+    <p class="sheet-body" id="overwriteBody"></p>
+    <div class="sheet-foot">
+      <div class="foot-spacer"></div>
+      <button class="btn" type="button" id="overwriteCancel" data-i18n="dialogs.cancel" autofocus></button>
+      <button class="btn destructive" type="button" id="overwriteConfirm" data-i18n="confirm.overwrite_confirm"></button>
+    </div>
+  </dialog>
+
+  <dialog class="sheet small" id="consentDialog" aria-labelledby="consentTitle">
+    <div class="sheet-head">
+      <h2 id="consentTitle"></h2>
+    </div>
+    <p class="sheet-body" id="consentBody"></p>
+    <div class="sheet-foot">
+      <div class="foot-spacer"></div>
+      <button class="btn" type="button" id="consentCancel" autofocus data-i18n="dialogs.cancel"></button>
+      <button class="btn destructive" type="button" id="consentConfirm" data-i18n="dialogs.continue"></button>
+    </div>
+  </dialog>
+
+  <dialog class="sheet small" id="passwordDialog" aria-labelledby="passwordTitle">
+    <div class="sheet-head">
+      <h2 id="passwordTitle" data-i18n="password.title"></h2>
+    </div>
+    <p class="sheet-body" id="passwordBody"></p>
+    <p class="sheet-note" data-i18n="password.permissions_hint"></p>
+    <label class="field" for="passwordInput">
+      <span data-i18n="password.label"></span>
+      <input class="mono" type="password" id="passwordInput" autocomplete="off">
+      <small data-i18n="password.hint"></small>
+    </label>
+    <div class="sheet-foot">
+      <div class="foot-spacer"></div>
+      <button class="btn" type="button" data-close-dialog="passwordDialog" data-i18n="dialogs.cancel"></button>
+      <button class="btn primary" type="button" id="passwordConfirm" data-i18n="password.retry"></button>
+    </div>
+  </dialog>
+
+  <dialog class="sheet" id="helpDialog" aria-labelledby="helpTitle">
+    <div class="sheet-head">
+      <h2 id="helpTitle" data-i18n="help.title"></h2>
+      <button class="icon-btn" type="button" data-close-dialog="helpDialog" data-i18n-aria="dialogs.close"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="help-grid">
+      <section>
+        <h3 data-i18n="help.about_title"></h3>
+        <p data-i18n="help.about_body"></p>
+        <p class="meta mono" id="helpVersion"></p>
+      </section>
+      <section>
+        <h3 data-i18n="help.shortcuts_title"></h3>
+        <dl class="shortcuts">
+          <div><dt class="mono">Ctrl / ⌘ + O</dt><dd data-i18n="help.sc_add"></dd></div>
+          <div><dt class="mono">Ctrl / ⌘ + Shift + O</dt><dd data-i18n="help.sc_folder"></dd></div>
+          <div><dt class="mono">Enter</dt><dd data-i18n="help.sc_run"></dd></div>
+          <div><dt class="mono">Ctrl / ⌘ + I</dt><dd data-i18n="help.sc_inspect"></dd></div>
+          <div><dt class="mono">← →</dt><dd data-i18n="help.sc_pages"></dd></div>
+          <div><dt class="mono">+ −</dt><dd data-i18n="help.sc_zoom"></dd></div>
+          <div><dt class="mono">R</dt><dd data-i18n="help.sc_reset"></dd></div>
+        </dl>
+      </section>
+    </div>
+    <div class="sheet-foot">
+      <div class="foot-spacer"></div>
+      <button class="btn primary" type="button" data-close-dialog="helpDialog" data-i18n="dialogs.done"></button>
+    </div>
+  </dialog>
+
+  <dialog class="inspector" id="inspectorDialog" aria-labelledby="inspectorName">
+    <div class="inspector-head">
+      <div class="inspector-title">
+        <span class="badge mono" id="inspectorBadge" data-i18n="inspector.badge_compare"></span>
+        <div>
+          <h2 id="inspectorName"></h2>
+          <p class="meta" id="inspectorSub"></p>
+        </div>
+      </div>
+      <div class="inspector-tools">
+        <div class="page-control">
+          <button class="icon-btn" id="pagePrev" type="button" data-i18n-aria="inspector.prev" data-i18n-title="inspector.prev"><svg><use href="#i-chevron-left"/></svg></button>
+          <label class="mono page-label" for="pageInput"><span class="sr-only" data-i18n="inspector.page"></span><input id="pageInput" class="mono" type="number" min="1" value="1"> <span id="pageTotal">/ 1</span></label>
+          <button class="icon-btn" id="pageNext" type="button" data-i18n-aria="inspector.next" data-i18n-title="inspector.next"><svg><use href="#i-chevron-right"/></svg></button>
+        </div>
+        <div class="zoom-pills" id="zoomPills" role="group" data-i18n-aria="inspector.zoom">
+          <button type="button" data-zoom="100" class="mono">100%</button>
+          <button type="button" data-zoom="200" class="mono">200%</button>
+          <button type="button" data-zoom="400" class="mono">400%</button>
+          <button type="button" data-zoom="800" class="mono">800%</button>
+        </div>
+        <button class="btn sm" id="btnInspectorReset" type="button"><svg><use href="#i-reset"/></svg><span data-i18n="inspector.reset"></span></button>
+        <button class="icon-btn" type="button" data-close-dialog="inspectorDialog" data-i18n-aria="dialogs.close"><svg><use href="#i-close"/></svg></button>
+      </div>
+    </div>
+
+    <div class="inspector-canvas" id="wipeCanvas">
+      <div class="wipe-half wipe-left">
+        <div class="wipe-stage" id="stageOrig">
+          <div class="page-stack" id="stackOrig"></div>
+        </div>
+      </div>
+      <div class="wipe-half wipe-right">
+        <div class="wipe-stage" id="stageSlim">
+          <div class="page-stack" id="stackSlim"></div>
+        </div>
+      </div>
+      <span class="corner-badge corner-left mono" id="badgeOriginal"></span>
+      <span class="corner-badge corner-right mono" id="badgeSlim"></span>
+      <div class="wipe-divider" id="wipeDivider" role="slider" tabindex="0"
+           aria-label="Wipe position" aria-valuemin="2" aria-valuemax="98" aria-valuenow="50">
+        <span class="wipe-handle"><svg><use href="#i-chevron-left"/></svg><svg><use href="#i-chevron-right"/></svg></span>
+      </div>
+    </div>
+
+    <div class="inspector-foot">
+      <span class="foot-label" data-i18n="inspector.original"></span>
+      <input type="range" id="wipeRange" min="2" max="98" step="1" value="50" aria-label="Wipe">
+      <span class="foot-label" data-i18n="inspector.slimmed"></span>
+      <span class="wipe-readout mono" id="wipeReadout">50%</span>
+      <span class="pan-hint" data-i18n="inspector.pan_hint"></span>
+      <div class="foot-spacer"></div>
+      <button class="btn" id="btnInspectorOpen" type="button"><svg><use href="#i-external"/></svg><span data-i18n="inspector.open_file"></span></button>
+      <button class="btn primary" type="button" data-close-dialog="inspectorDialog" data-i18n="dialogs.done"></button>
+    </div>
+  </dialog>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,280 @@
+'use strict';
+
+/**
+ * Electron main process.
+ *
+ * The window is a thin shell: it spawns the Python engine as a local server,
+ * waits for its ready line, then loads the HTML/CSS/JS interface from it. The
+ * Python process is the only backend, so the browser build and the desktop
+ * build share one API and one state model.
+ */
+
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell } = require('electron');
+const { spawn } = require('node:child_process');
+const path = require('node:path');
+const fs = require('node:fs');
+
+const READY_PREFIX = 'OZEMPDF_READY ';
+const START_TIMEOUT_MS = 30000;
+
+let mainWindow = null;
+let engineProcess = null;
+let serverUrl = null;
+let quitting = false;
+let forceClose = false;
+
+function repoRoot() {
+  return path.resolve(__dirname, '..');
+}
+
+function engineCommand() {
+  const exeName = process.platform === 'win32' ? 'ozempdf-engine.exe' : 'ozempdf-engine';
+  const root = app.isPackaged
+    ? path.join(process.resourcesPath, 'engine')
+    : path.join(repoRoot(), 'dist', 'engine');
+  // Directory builds are preferred (no temp extraction); a one-file build is
+  // still accepted for anyone who packages that way.
+  const candidates = [
+    path.join(root, 'ozempdf-engine', exeName),
+    path.join(root, exeName),
+  ];
+  const bundled = candidates.find((candidate) => fs.existsSync(candidate));
+  const useBundled = app.isPackaged || process.env.OZEMPDF_USE_BUNDLED === '1';
+  if (useBundled && bundled) {
+    return { command: bundled, args: ['--serve', '--port', '0', '--no-browser'], cwd: path.dirname(bundled), python: false };
+  }
+  // A source checkout runs the live Python package so edits take effect; the
+  // frozen sidecar is what ships.
+  const python = process.env.OZEMPDF_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  return {
+    command: python,
+    args: ['-m', 'ozempdf', '--serve', '--port', '0', '--no-browser'],
+    cwd: repoRoot(),
+    python: true,
+  };
+}
+
+function startEngine() {
+  const spec = engineCommand();
+  const env = { ...process.env };
+  if (spec.python) {
+    const srcDir = app.isPackaged
+      ? path.join(process.resourcesPath, 'engine', 'src')
+      : path.join(repoRoot(), 'src');
+    env.PYTHONPATH = srcDir + (env.PYTHONPATH ? path.delimiter + env.PYTHONPATH : '');
+    env.PYTHONUNBUFFERED = '1';
+    env.PYTHONIOENCODING = 'utf-8';
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const child = spawn(spec.command, spec.args, { cwd: spec.cwd, env, windowsHide: true });
+    engineProcess = child;
+    let buffer = '';
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('The OzemPDF engine did not start in time.'));
+      }
+    }, START_TIMEOUT_MS);
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      let index;
+      while ((index = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, index).trim();
+        buffer = buffer.slice(index + 1);
+        if (line.startsWith(READY_PREFIX)) {
+          try {
+            const info = JSON.parse(line.slice(READY_PREFIX.length));
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              resolve(info.url);
+            }
+          } catch (error) {
+            /* keep waiting */
+          }
+        }
+      }
+    });
+
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => {
+      process.stderr.write(chunk);
+    });
+
+    child.on('error', (error) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      }
+    });
+
+    child.on('exit', (code) => {
+      engineProcess = null;
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(new Error(`The OzemPDF engine exited with code ${code}.`));
+      } else if (!quitting) {
+        dialog.showErrorBox(
+          'OzemPDF engine stopped',
+          'The local engine process ended unexpectedly. Reopen OzemPDF to continue.\n\n' +
+            'If this keeps happening, run `python -m ozempdf --serve` in a terminal to see the error.'
+        );
+        app.quit();
+      }
+    });
+  });
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 860,
+    minWidth: 1000,
+    minHeight: 680,
+    show: false,
+    backgroundColor: '#111210',
+    title: 'OzemPDF',
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false,
+    },
+  });
+
+  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!serverUrl || !url.startsWith(serverUrl)) event.preventDefault();
+  });
+
+  // Guard against closing mid-run (US-053).
+  mainWindow.on('close', async (event) => {
+    if (forceClose || !mainWindow) return;
+    event.preventDefault();
+    let info = null;
+    try {
+      info = await mainWindow.webContents.executeJavaScript(
+        'window.__ozemCloseGuard ? window.__ozemCloseGuard() : null'
+      );
+    } catch (error) {
+      info = null;
+    }
+    if (info && info.running) {
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'warning',
+        buttons: [info.cancel || 'Cancel', info.quit || 'Quit anyway'],
+        defaultId: 0,
+        cancelId: 0,
+        title: info.title || 'Slimming is still running',
+        message: info.body || 'Files are still being processed.',
+        detail: info.detail || '',
+      });
+      if (choice !== 1) return;
+      try {
+        await mainWindow.webContents.executeJavaScript(
+          'window.__ozemStopAndWait ? window.__ozemStopAndWait() : true'
+        );
+      } catch (error) {
+        /* the engine is killed below regardless */
+      }
+    }
+    forceClose = true;
+    mainWindow.destroy();
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  if (serverUrl) mainWindow.loadURL(serverUrl);
+}
+
+ipcMain.handle('dialog:pick-paths', async (_event, kind) => {
+  const window = mainWindow;
+  const options = { properties: ['openFile'], filters: [] };
+  if (kind === 'folder' || kind === 'output') {
+    options.properties = kind === 'output' ? ['openDirectory', 'createDirectory'] : ['openDirectory'];
+  } else if (kind === 'files') {
+    options.properties = ['openFile', 'multiSelections'];
+    options.filters = [{ name: 'PDF documents', extensions: ['pdf'] }];
+  } else if (kind === 'cert') {
+    options.filters = [{ name: 'PKCS#12 certificate', extensions: ['p12', 'pfx'] }];
+  }
+  const result = await dialog.showOpenDialog(window, options);
+  return result.canceled ? [] : result.filePaths;
+});
+
+ipcMain.handle('shell:open-path', async (_event, target) => {
+  if (typeof target !== 'string' || !target) return { ok: false };
+  return { ok: (await shell.openPath(target)) === '' };
+});
+
+ipcMain.handle('shell:show-item', (_event, target) => {
+  if (typeof target === 'string' && target) shell.showItemInFolder(target);
+  return { ok: true };
+});
+
+function stopEngine() {
+  if (!engineProcess) return;
+  const child = engineProcess;
+  engineProcess = null;
+  try {
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true });
+    } else {
+      child.kill('SIGTERM');
+    }
+  } catch (error) {
+    /* best effort */
+  }
+}
+
+app.whenReady().then(async () => {
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }])
+    );
+  } else {
+    Menu.setApplicationMenu(null);
+  }
+
+  try {
+    serverUrl = await startEngine();
+  } catch (error) {
+    dialog.showErrorBox(
+      'OzemPDF could not start',
+      `${error.message}\n\n` +
+        'The desktop app needs its Python engine. Install the package with\n' +
+        '  pip install -e .\n' +
+        'or point OZEMPDF_PYTHON at a Python executable that has OzemPDF installed.'
+    );
+    app.quit();
+    return;
+  }
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  quitting = true;
+  stopEngine();
+  if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  quitting = true;
+  stopEngine();
+});

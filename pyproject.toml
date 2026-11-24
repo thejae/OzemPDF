@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ozempdf"
+description = "Surgical lossless and visually-lossless PDF slimming with a local web UI"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dynamic = ["version"]
+dependencies = [
+  "pikepdf>=8.0.0",
+  "Pillow>=10.0.0",
+  "zopfli>=0.2.2",
+  "fonttools>=4.40.0",
+  "pypdfium2>=4.20.0",
+  "pyhanko>=0.25.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pyinstaller>=6.0"]
+
+[project.scripts]
+ozempdf = "ozempdf.__main__:main"
+ozempdf-gui = "ozempdf.gui:launch_gui"
+
+[tool.setuptools.dynamic]
+version = { attr = "ozempdf._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ozempdf = [
+  "locales/*.json",
+  "web/*.html",
+  "web/*.css",
+  "web/*.js",
+  "web/fonts/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501", "B008"]
