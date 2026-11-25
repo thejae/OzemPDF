@@ -88,11 +88,8 @@ confidential. A synthetic PDF that reproduces the problem is ideal.
 
 ## Security
 
-Do not open a public issue for a vulnerability. Follow [`SECURITY.md`](SECURITY.md).
-
-## Code of conduct
-
-Participation is covered by [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+Do not open a public issue for a vulnerability; use the repository's private security advisory
+channel instead.
 
 ## License
 

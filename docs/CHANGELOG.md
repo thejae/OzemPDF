@@ -11,9 +11,9 @@ All notable changes to OzemPDF are documented here. The format follows
 - **Clicking outside the inspector dismisses it.** A press on the backdrop closes the modal; a press
   that starts inside (a pan or wipe drag that happens to end outside the dialog) does not.
 - **Publication metadata and community files.** `pyproject.toml` and `electron/package.json` carry
-  repository URLs, keywords, classifiers and author details; `CONTRIBUTING.md`, `SECURITY.md`,
-  `CODE_OF_CONDUCT.md`, issue forms, a pull-request template, `CODEOWNERS` and Dependabot document
-  how to contribute, report defects and disclose vulnerabilities.
+  repository URLs, keywords, classifiers and author details; `CONTRIBUTING.md`, issue forms, a
+  pull-request template, `CODEOWNERS` and Dependabot document how to contribute, report defects and
+  disclose vulnerabilities.
 - **A package-metadata job in CI.** Every push and pull request builds an sdist, so a broken
   `pyproject.toml` fails before it reaches a release.
 
@@ -34,6 +34,9 @@ All notable changes to OzemPDF are documented here. The format follows
 
 - **`AGENTS.md` is no longer published.** The agent rules stay on developer machines and are ignored
   by Git; the invariant contract, gates and commit convention now live in `CONTRIBUTING.md`.
+- **The code-of-conduct and security-policy files were dropped.** `CODE_OF_CONDUCT.md` and
+  `SECURITY.md` are removed; vulnerability reports go through the repository's private security
+  advisory channel, and `CONTRIBUTING.md` states the expectations that matter.
 
 ### Fixed
 

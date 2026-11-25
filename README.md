@@ -283,9 +283,9 @@ The documentation lives in [`docs/`](docs/):
 ## Contributing
 
 Issues and pull requests are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the development
-setup, the invariant contract, the gates every change must pass and the commit convention. Security
-reports go through the private channel described in [`SECURITY.md`](SECURITY.md), and participation
-is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
+setup, the invariant contract, the gates every change must pass and the commit convention. Report
+security-sensitive problems through the repository's private security advisory channel rather than a
+public issue.
 
 ## License
 
