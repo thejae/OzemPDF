@@ -27,6 +27,7 @@ Declared in `pyproject.toml` under `[project.optional-dependencies].dev`.
 | `pytest` | `>=7.4` | Test suite (`python -m pytest -q`) |
 | `pyinstaller` | `>=6.0` | Frozen engine build (`python python/scripts/build_cross_platform.py`) |
 | `ruff` | `>=0.6` | Lint gate (`ruff check python/src python/tests`); installed with the `dev` extra |
+| `numpy` | `>=1.24` | Fixture image generation and pixel comparisons in the test suite |
 
 ## Node / Electron
 

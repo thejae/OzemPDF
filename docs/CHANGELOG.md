@@ -24,6 +24,10 @@ All notable changes to OzemPDF are documented here. The format follows
 
 ### Fixed
 
+- **CI installs the test dependencies it needs.** The fixture builders and pixel comparisons import
+  numpy, but it was never declared, so a fresh `pip install -e ".[dev]"` produced a suite that died
+  at `conftest` import — every GitHub Actions pytest job failed while local runs (with numpy already
+  present) passed. numpy is now in the `dev` extra.
 - **A failed file no longer reports 100 % savings.** `FileCompressionResult.bytes_saved` ignored
   `success`, so a document that could not be opened (empty, truncated beyond recovery, wrong
   password) was serialised with `compressed_bytes: 0`, `bytes_saved` equal to its whole size and
