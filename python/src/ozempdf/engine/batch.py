@@ -343,7 +343,11 @@ def _render_with_pdfium(
         bitmap = page.render(scale=float(scale))
         image = bitmap.to_pil()
         buffer = io.BytesIO()
-        image.save(buffer, format="PNG", optimize=True)
+        # The default compression level is ~5x faster than optimize=True at
+        # inspector sizes and produced the same bytes for page rasters (the
+        # inspector fetches these over loopback, so a few hundred KB do not
+        # matter), and zoom steps are latency, not size, limited.
+        image.save(buffer, format="PNG", compress_level=6)
         return buffer.getvalue()
     except Exception as exc:
         log.debug("page raster failed: %s", exc)

@@ -1324,9 +1324,16 @@
     drag: null,
   };
 
+  // Pending zoom rasterisation; a wheel gesture coalesces into one render.
+  let zoomTimer = null;
+
   function openInspector(id) {
     const item = state.queue.find((row) => row.id === id);
     if (!item) return;
+    if (zoomTimer) {
+      clearTimeout(zoomTimer);
+      zoomTimer = null;
+    }
     insp.id = id;
     insp.item = item;
     insp.page = 1;
@@ -1490,10 +1497,21 @@
 
   function setInspectorZoom(zoom) {
     insp.zoom = zoom;
-    loadInspectorPage();
+    // A wheel gesture produces several steps; only the level the user stops at
+    // is rasterised (each step re-renders two pages at the new scale).
+    if (zoomTimer) clearTimeout(zoomTimer);
+    renderInspectorChrome();
+    zoomTimer = setTimeout(() => {
+      zoomTimer = null;
+      loadInspectorPage();
+    }, 140);
   }
 
   function resetInspector() {
+    if (zoomTimer) {
+      clearTimeout(zoomTimer);
+      zoomTimer = null;
+    }
     insp.zoom = 200;
     insp.wipe = 50;
     $('#pageInput').value = String(insp.page);
@@ -1511,6 +1529,13 @@
     dialog.addEventListener('drop', (event) => {
       event.preventDefault();
       event.stopPropagation();
+    });
+    // A zoom queued just before closing must not fire into a closed dialog.
+    dialog.addEventListener('close', () => {
+      if (zoomTimer) {
+        clearTimeout(zoomTimer);
+        zoomTimer = null;
+      }
     });
     canvas.addEventListener('pointerdown', (event) => {
       // The floating pager lives on the canvas; its buttons must keep their

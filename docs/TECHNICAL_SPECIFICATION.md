@@ -699,7 +699,8 @@ filter applies to scans only, never to explicit files.
   interface requests a thumbnail for the queue and a larger render for the inspector. PDFium is
   **not thread-safe**, so every call (open, page, render, close) runs under one module lock; the
   inspector asks for both halves at once and the thumbnail pool runs in parallel, and overlapping
-  calls corrupt PDFium's global state, after which every later render fails. When PDFium refuses a
+  calls corrupt PDFium's global state, after which every later render fails. PNG uses the default
+  compression level: `optimize=True` cost ~5× for the same bytes at preview sizes. When PDFium refuses a
   document that qpdf can still reconstruct — a lost cross-reference table, for instance — the page
   is rendered from a repaired in-memory copy; no file on disk is touched. A document password
   supplied for the run is kept in the row (in memory only) and used for its previews.
@@ -1019,7 +1020,9 @@ draggable handle sit on the seam; corner badges read `ORIGINAL (size)` and
 
 Interaction: dragging near the divider wipes, dragging elsewhere pans, the wheel zooms (anywhere in
 the dialog except over a text field), and the keys
-`←`/`→` step pages, `+`/`=`/`-` zoom and `R` resets. Pages are rendered by `/api/page` with
+`←`/`→` step pages, `+`/`=`/`-` zoom and `R` resets. A zoom change highlights the pills immediately
+and coalesces the rasterisation behind a 140 ms timer, so a wheel gesture renders only the level it
+stops at. Pages are rendered by `/api/page` with
 `scale = clamp(1.15 * (zoom/200), 0.5, 3400/longest_side)` so a huge page cannot stall the dialog.
 The footer holds the wipe slider (2–98), the percentage readout, a pan hint, `Open file` and `Done`.
 A page the engine cannot rasterise shows a localized notice over the canvas instead of leaving a

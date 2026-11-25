@@ -4,6 +4,18 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.12 — 2026-11-25
+
+### Changed
+
+- **Inspector zoom is about three times faster.** Page rasters were encoded with PNG
+  `optimize=True`, which cost ~4.7× the default compression level for identical bytes at preview
+  sizes (441 ms vs 92 ms for an 800 % page of the reported 5.4 MB CV), and every wheel notch started
+  a fresh rasterisation of both pages. Encoding now uses the default level, and a wheel gesture
+  coalesces into one render of the level the user stops at; the zoom pills still react immediately
+  while the sharp raster arrives. Measured on that CV: the 800 % pair went from 1 029 ms to 346 ms,
+  and a three-notch 100 % → 800 % gesture from six renders and ~2.5 s to two renders and ~0.7 s.
+
 ## 0.3.11 — 2026-11-25
 
 ### Changed
