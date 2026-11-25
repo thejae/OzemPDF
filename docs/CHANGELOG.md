@@ -4,6 +4,16 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.13 — 2026-11-25
+
+### Changed
+
+- **The advanced pane's section titles have breathing room.** A fieldset `<legend>` is placed in the
+  border area, so the card's top padding never reached it and `Raster images`,
+  `Stream & deflate engine` and `Fonts, metadata & locks` sat directly on the rule above the drawer.
+  The legend now carries the card's 14 px top inset (15 px from the rule, border included), while the
+  vertical card rules still meet that top rule; the narrow one-column layout inherits it.
+
 ## 0.3.12 — 2026-11-25
 
 ### Changed

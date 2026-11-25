@@ -1178,7 +1178,9 @@ main {
 }
 
 .drawer-card legend {
-  padding: 0;
+  /* A fieldset legend sits in the border area, so the card's padding does not
+     reach it; without this the section titles touch the rule above the drawer. */
+  padding: 14px 0 0;
   margin-bottom: 12px;
   font-size: 10px;
   font-weight: 600;
