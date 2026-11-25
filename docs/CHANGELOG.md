@@ -25,6 +25,10 @@ All notable changes to OzemPDF are documented here. The format follows
 - **Repository hygiene.** `.gitattributes` normalises text and marks binaries, `.gitignore` ignores
   the runtime `data/` folder and local agent instructions, and `.editorconfig` records the existing
   indentation and line endings.
+- **Documentation was audited for personal and sensitive data.** No keys, tokens, passwords, private
+  URLs, user-specific paths or real names were found in the published files; the one historical note
+  that pointed at the signing-passphrase location now reads as a generic non-interactive-signing
+  rule.
 
 ### Removed
 
@@ -226,8 +230,8 @@ All notable changes to OzemPDF are documented here. The format follows
   surface 8.6:1, white on accent 9.0:1, accent on its tint 7.6:1 in the light theme; 7.8:1, 8.0:1
   and 6.3:1 in the dark theme, all above the 4.5:1 floor.
 - The application icon follows the accent, so the taskbar, window and ZIP read as the same product.
-- `AGENTS.md` now records where the GitHub GPG passphrase lives, so agents can read it when signing
-  commits instead of asking the user each time.
+- Commit signing is non-interactive: the signing credential is read from the local environment, so
+  agents never ask the user for it.
 - **Documentation synchronised with the shipped application.** The technical specification is
   rewritten as version 2.0 for the HTML/CSS/Electron architecture (new interface chapter, real
   preset/range/config tables, a defects-and-limitations chapter, current test inventory); the user
