@@ -1,9 +1,13 @@
+<div align="center">
+
 # OzemPDF
 
 [![ci](https://github.com/thejae/OzemPDF/actions/workflows/ci.yml/badge.svg)](https://github.com/thejae/OzemPDF/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/thejae/OzemPDF?label=release)](https://github.com/thejae/OzemPDF/releases/latest)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](pyproject.toml)
+
+</div>
 
 **Surgical lossless and visually-lossless PDF slimming.**
 
