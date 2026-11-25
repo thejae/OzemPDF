@@ -20,8 +20,8 @@
   },
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win zip",
-    "dist:linux": "electron-builder --linux"
+    "dist": "electron-builder --win zip --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "devDependencies": {
     "electron": "^38.0.0",
@@ -79,10 +79,12 @@
       "category": "Office",
       "icon": "assets/icon.png",
       "maintainer": "OzemPDF contributors <738694+thejae@users.noreply.github.com>",
-      "artifactName": "OzemPDF-${version}-linux-${arch}.${ext}"
+      "artifactName": "OzemPDF-${version}-linux-${arch}.${ext}",
+      "syncDesktopName": true
     }
   },
   "allowScripts": {
     "electron@38.0.0": true
-  }
+  },
+  "desktopName": "OzemPDF"
 }

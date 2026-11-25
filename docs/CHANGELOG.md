@@ -11,7 +11,8 @@ All notable changes to OzemPDF are documented here. The format follows
 - **Linux packages are built in CI.** A `package-linux` job freezes the engine on Ubuntu and runs
   electron-builder for an AppImage and a deb, verifies the frozen engine and extracts the AppImage
   to check the bundled engine, then uploads both artifacts. The Windows `.cmd` launchers are now
-  scoped to the Windows bundle with `win.extraFiles`.
+  scoped to the Windows bundle with `win.extraFiles`; builds pass `--publish never` so CI never
+  attempts a release, and `desktopName`/`syncDesktopName` give the window a stable WM_CLASS.
 
 ### Changed
 
