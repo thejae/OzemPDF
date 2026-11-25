@@ -10,7 +10,7 @@ path in this repository.
 
 | ID | Was | Now |
 | --- | --- | --- |
-| **D-01** | Copy claimed MozJPEG; the encoder was Pillow/libjpeg-turbo | UI, README and changelog say "progressive JPEG (Pillow/libjpeg-turbo)". No MozJPEG claim exists anywhere. |
+| **D-01** | Copy claimed MozJPEG; the encoder was Pillow/libjpeg-turbo | The MozJPEG claim is gone: the UI and README say "progressive JPEG" and name no encoder brand, and [`DEPENDENCIES.md`](DEPENDENCIES.md) attributes JPEG handling to Pillow. No MozJPEG claim exists anywhere. |
 | **D-02** | Predictor documented five filters but implemented None/Sub/Up; `_paeth_predictor` was dead code | All five filters are implemented and selected per row by the libpng heuristic. Round-trip and reference tests in `python/tests/test_visually_lossless.py` (`test_predictor_roundtrip_all_filters`, `test_paeth_filter_matches_reference`). |
 | **D-03** | GUI DPI slider stopped at 300 while config allowed 600; Strict Lossless was a slider display hack | One range (72–600) in UI, API, CLI and config. Strict Lossless is a real `strict_lossless` flag that disables downsampling and force-converts nothing. |
 | **D-04** | GUI JPEG max 95, CLI 98 | Single range 50–98 everywhere, clamped in `CompressionConfig.clamped()`. |

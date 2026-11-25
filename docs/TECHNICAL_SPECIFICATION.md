@@ -1702,7 +1702,7 @@ the evidence (test or code path) for each. This table is the short form.
 
 | ID | Defect at 0.2.0 | Resolution at 0.3.3 |
 | --- | --- | --- |
-| `D-01` | Copy claimed MozJPEG; encoder was Pillow/libjpeg-turbo | Claim removed; docs say "progressive JPEG (Pillow/libjpeg-turbo)" |
+| `D-01` | Copy claimed MozJPEG; encoder was Pillow/libjpeg-turbo | Claim removed; docs say "progressive JPEG" with no encoder brand, and `docs/DEPENDENCIES.md` attributes encoding to Pillow |
 | `D-02` | Predictor documented five filters, implemented None/Sub/Up; Paeth dead | All five filters implemented and selected per row; round-trip and reference tests |
 | `D-03` | GUI DPI stopped at 300; Strict Lossless was a slider display hack | One range 72–600 everywhere; `strict_lossless` is a real flag |
 | `D-04` | GUI JPEG max 95, CLI 98 | Single range 50–98 |

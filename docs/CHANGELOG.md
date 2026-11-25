@@ -8,8 +8,9 @@ All notable changes to OzemPDF are documented here. The format follows
 
 ### Changed
 
-- **The discrepancy ledger is current again.** It records N-14 and N-15, and retires the frozen
-  0.3.3-era string counts, version claim and developer-path fragment.
+- **The discrepancy ledger is current again.** It records N-14 and N-15, retires the frozen
+  0.3.3-era string counts, version claim and developer-path fragment, and corrects D-01's evidence
+  wording — the docs name no encoder brand, they simply no longer mention MozJPEG.
 
 ### Fixed
 
