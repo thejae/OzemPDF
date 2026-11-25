@@ -14,6 +14,9 @@ All notable changes to OzemPDF are documented here. The format follows
 - **The ledger states its own status.** A banner and an at-a-glance table say that all 36 defects
   are closed and that only the Deferred section is open, so the page reads as history rather than a
   backlog.
+- **The README release badge shows the release name.** The suffixed per-commit tag
+  (`v0.3.15-…`) stays in the URL, but the badge renders `OzemPDF 0.3.15` via
+  `display_name=release`.
 - **The README header is centred.** The title, the badge row and the tagline sit in a centred block;
   the rest of the page stays left-aligned.
 - **Documentation and screenshots match 0.3.15.** The specification now names 0.3.15 as the described
