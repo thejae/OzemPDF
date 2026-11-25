@@ -1326,6 +1326,8 @@
 
   // Pending zoom rasterisation; a wheel gesture coalesces into one render.
   let zoomTimer = null;
+  // Bumped per page load so a slow pair of rasters cannot overwrite a newer one.
+  let inspectorLoad = 0;
 
   function openInspector(id) {
     const item = state.queue.find((row) => row.id === id);
@@ -1431,26 +1433,46 @@
     const base = `/api/page?id=${encodeURIComponent(insp.id)}&page=${insp.page}&zoom=${insp.zoom}`;
     const orig = inspectorLayer('origImg', 'stackOrig');
     const slim = inspectorLayer('slimImg', 'stackSlim');
+    const token = ++inspectorLoad;
     clearInspectorNotice();
-    orig.onload = () => {
-      insp.imgW = orig.naturalWidth;
-      insp.imgH = orig.naturalHeight;
-      centerInspector();
-    };
-    // A page the engine cannot rasterise must say so instead of leaving the
-    // dark canvas looking broken.
-    orig.onerror = () => showInspectorNotice(t('inspector.render_failed'));
-    orig.src = `${base}&side=orig&t=${Date.now()}`;
-    if (insp.hasSlim) {
-      slim.style.visibility = 'visible';
-      slim.onerror = () => showInspectorNotice(t('inspector.render_failed'));
-      slim.src = `${base}&side=slim&t=${Date.now()}`;
-    } else {
-      slim.onerror = null;
-      slim.removeAttribute('src');
-      slim.style.visibility = 'hidden';
-    }
+    // Preload both halves and swap them in together. Assigning src directly
+    // blanks the element until its raster arrives; the halves render one after
+    // the other, so the slimmed side blanked visibly while the original already
+    // showed the new zoom.
+    const stamp = Date.now();
+    const jobs = [preloadInspectorImage(`${base}&side=orig&t=${stamp}`)];
+    if (insp.hasSlim) jobs.push(preloadInspectorImage(`${base}&side=slim&t=${stamp}`));
+    Promise.all(jobs)
+      .then(([original, slimmed]) => {
+        if (token !== inspectorLoad) return;
+        insp.imgW = original.naturalWidth;
+        insp.imgH = original.naturalHeight;
+        orig.src = original.src;
+        if (slimmed) {
+          slim.style.visibility = 'visible';
+          slim.src = slimmed.src;
+        } else {
+          slim.removeAttribute('src');
+          slim.style.visibility = 'hidden';
+        }
+        centerInspector();
+      })
+      .catch(() => {
+        if (token === inspectorLoad) showInspectorNotice(t('inspector.render_failed'));
+      });
     renderInspectorChrome();
+  }
+
+  function preloadInspectorImage(url) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        if (image.decode) image.decode().then(() => resolve(image), () => resolve(image));
+        else resolve(image);
+      };
+      image.onerror = () => reject(new Error('page render failed'));
+      image.src = url;
+    });
   }
 
   function canvasSize() {
@@ -1530,12 +1552,24 @@
       event.preventDefault();
       event.stopPropagation();
     });
-    // A zoom queued just before closing must not fire into a closed dialog.
+    // A zoom queued just before closing must not fire into a closed dialog, and
+    // a preload still in flight must not swap rasters in after it closed.
     dialog.addEventListener('close', () => {
       if (zoomTimer) {
         clearTimeout(zoomTimer);
         zoomTimer = null;
       }
+      inspectorLoad += 1;
+    });
+    // Clicking the backdrop dismisses the inspector. A drag that happens to end
+    // outside the dialog is not a click on it, so track where the press began.
+    let backdropPress = false;
+    dialog.addEventListener('pointerdown', (event) => {
+      backdropPress = event.target === dialog;
+    });
+    dialog.addEventListener('click', (event) => {
+      if (backdropPress && event.target === dialog) closeDialog('inspectorDialog');
+      backdropPress = false;
     });
     canvas.addEventListener('pointerdown', (event) => {
       // The floating pager lives on the canvas; its buttons must keep their

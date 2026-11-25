@@ -4,6 +4,22 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.14 — 2026-11-25
+
+### Added
+
+- **Clicking outside the inspector dismisses it.** A press on the backdrop closes the modal; a press
+  that starts inside (a pan or wipe drag that happens to end outside the dialog) does not.
+
+### Fixed
+
+- **The slimmed half no longer flashes while zooming.** Every zoom step replaced both `<img>` sources
+  at once, which blanks an element until its raster arrives; the halves render one after the other
+  (PDFium calls are serialized), so the original appeared first and the slimmed side stayed blank for
+  a few hundred milliseconds. Both rasters are now preloaded and swapped in together, so the page
+  keeps the previous zoom until the pair is ready. A failed render keeps the previous pair and shows
+  the notice instead of blanking the canvas.
+
 ## 0.3.13 — 2026-11-25
 
 ### Changed

@@ -1029,6 +1029,10 @@ A page the engine cannot rasterise shows a localized notice over the canvas inst
 silent dark stage; the file on disk is untouched. Multi-page documents also carry a floating pair of
 round previous/next buttons at the bottom right of the canvas (the header page control remains);
 they disable at the first and last page and are hidden entirely for single-page documents.
+Page and zoom changes preload both halves and swap them in together, so the dialog keeps the previous
+rasters (no blank flash on the slower slimmed side) and a failed render keeps them with the notice.
+A press on the backdrop closes the dialog; a press that started inside does not, so a pan or wipe
+that ends outside is not mistaken for a dismissal.
 
 ### 7.11 Drag and drop
 
