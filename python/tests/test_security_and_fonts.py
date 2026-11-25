@@ -128,6 +128,62 @@ def test_permission_denied_is_actionable(
     assert not output.exists()
 
 
+def test_denied_output_names_the_folder_not_the_temp_file(
+    assets, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A denied write must point at the folder the user chose, not our temp name.
+
+    Reported from a OneDrive folder: the message named a random
+    ``.ozempdf_*.tmp.pdf`` the user could never open, and suggested closing an
+    application holding it. The temp file is an implementation detail.
+    """
+    from ozempdf.engine import pipeline
+
+    def always_denied(source, destination):
+        raise PermissionError(13, "Permission denied", str(source))
+
+    monkeypatch.setattr(pipeline.os, "replace", always_denied)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = compress_pdf_file(
+        assets.ui, out_dir / "result.pdf", CompressionConfig.from_preset("balanced")
+    )
+    assert result.success is False
+    assert "Could not write the result into" in result.error_message
+    assert str(out_dir) in result.error_message
+    assert ".ozempdf_" not in result.error_message
+    # Every retry ran, then the temp file was cleaned up.
+    assert list(out_dir.iterdir()) == []
+
+
+def test_transient_lock_on_the_output_is_retried(
+    assets, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cloud/AV locks are momentary: one denial must not fail the file."""
+    from ozempdf.engine import pipeline
+
+    real_replace = pipeline.os.replace
+    attempts = {"count": 0}
+
+    def flaky(source, destination):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise PermissionError(13, "Permission denied", str(source))
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(pipeline.os, "replace", flaky)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = compress_pdf_file(
+        assets.ui, out_dir / "retried.pdf", CompressionConfig.from_preset("balanced")
+    )
+    assert result.success is True, result.error_message
+    # The first denial was retried rather than reported. pikepdf promotes its
+    # own save through a temp file, so one save attempt is more than one call.
+    assert attempts["count"] > 1
+    assert (out_dir / "retried.pdf").is_file()
+
+
 def test_protection_classification(assets) -> None:
     assert inspect_protection(assets.ui).kind is ProtectionKind.NONE
     assert inspect_protection(assets.signed).kind is ProtectionKind.PERMISSIONS

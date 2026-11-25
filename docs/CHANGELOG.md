@@ -4,6 +4,19 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.5 — 2026-11-25
+
+### Fixed
+
+- **A denied write into the output folder now retries, then names the folder.** Reported from a
+  OneDrive folder, the failure read `Permission denied for …\.ozempdf_288mw5gc.tmp.pdf` and advised
+  closing whichever application held that file — a random temporary name the user could neither find
+  nor act on. Two changes: temp-file creation, the pikepdf save and the atomic promotion now retry
+  briefly (50/150/400 ms), because OneDrive, antivirus scanners and the indexer take short-lived
+  handles on files they are syncing or inspecting; and a denial that persists is now reported against
+  the destination folder with the OS reason, suggesting a sync check or another output folder. A
+  denial while reading the input keeps the original download-the-cloud-copy advice.
+
 ## 0.3.4 — 2026-11-25
 
 ### Added

@@ -32,6 +32,25 @@ from .unlock import PasswordRequiredError, UnsupportedProtectionError, open_and_
 
 log = get_logger()
 
+TEMP_PREFIX = ".ozempdf_"
+# OneDrive's sync engine, antivirus scanners and the search indexer take
+# short-lived handles on files they are syncing or inspecting, so a write can
+# be denied for a moment and succeed immediately afterwards. Only access
+# denials are retried, so a genuine permission problem still fails.
+LOCK_RETRY_DELAYS = (0.05, 0.15, 0.4)
+
+
+def _with_lock_retry(operation, *args, **kwargs):
+    """Run *operation*, retrying brief access denials from cloud/lock holders."""
+    for delay in (*LOCK_RETRY_DELAYS, None):
+        try:
+            return operation(*args, **kwargs)
+        except PermissionError:
+            if delay is None:
+                raise
+            time.sleep(delay)
+
+
 
 @dataclass(slots=True)
 class FileCompressionResult:
@@ -159,6 +178,7 @@ def compress_pdf_file(
 
     temp: Path | None = None
     pdf: pikepdf.Pdf | None = None
+    writing_output = False
     try:
         # Stage 1 — unlock. Re-signing also requires removing the old signature.
         flatten = cfg.unlock_and_flatten_signatures or cfg.sign_after_slimming
@@ -198,8 +218,10 @@ def compress_pdf_file(
         except Exception:
             pass
 
+        writing_output = True
         temp = _temp_path(target.parent)
-        pdf.save(
+        _with_lock_retry(
+            pdf.save,
             temp,
             object_stream_mode=(
                 pikepdf.ObjectStreamMode.generate
@@ -244,7 +266,7 @@ def compress_pdf_file(
             if result.kept_original_guardrail
             else _audit_written_file(temp, result.before_breakdown)
         )
-        os.replace(temp, target)
+        _with_lock_retry(os.replace, temp, target)
         temp = None
         result.compressed_bytes = target.stat().st_size
         result.already_optimal = (
@@ -267,8 +289,20 @@ def compress_pdf_file(
         result.required_password = True
         result.error_message = t("errors.protection_unsupported")
     except PermissionError as exc:
-        blocked = getattr(exc, "filename", None) or str(source)
-        result.error_message = t("errors.permission_denied", path=blocked)
+        # Once the output is being written, a denial is a destination-folder
+        # problem, unless it names the input itself. The OS message names
+        # whichever handle failed — pikepdf's temp, ours, or the target — none
+        # of which the user can act on, so report the folder instead.
+        blocked = getattr(exc, "filename", None) or ""
+        locked_input = bool(blocked) and Path(blocked) == Path(source)
+        if writing_output and not locked_input:
+            result.error_message = t(
+                "errors.output_denied",
+                folder=str(target.parent),
+                reason=exc.strerror or exc.__class__.__name__,
+            )
+        else:
+            result.error_message = t("errors.permission_denied", path=blocked or str(source))
     except SigningError as exc:
         result.error_message = f"{t('errors.signing_failed')}: {exc}"
     except Exception as exc:  # FR-PIPE-3: never leak an exception to callers.
@@ -290,10 +324,18 @@ def compress_pdf_file(
 
 
 def _temp_path(directory: Path) -> Path:
-    """Create a same-volume temporary path so the final replace is atomic."""
-    handle, name = tempfile.mkstemp(prefix=".ozempdf_", suffix=".tmp.pdf", dir=directory)
-    os.close(handle)
-    return Path(name)
+    """Create a same-volume temporary path so the final replace is atomic.
+
+    Creation is retried briefly: a cloud folder that is syncing that moment can
+    deny the name and accept it a fraction of a second later.
+    """
+
+    def create() -> Path:
+        handle, name = tempfile.mkstemp(prefix=TEMP_PREFIX, suffix=".tmp.pdf", dir=directory)
+        os.close(handle)
+        return Path(name)
+
+    return _with_lock_retry(create)
 
 
 def _audit_written_file(path: Path, fallback: CategoryBreakdown) -> CategoryBreakdown:

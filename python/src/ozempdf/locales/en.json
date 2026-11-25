@@ -271,6 +271,7 @@
     "signing_failed": "Signing failed",
     "read_failed": "This file could not be read as a PDF",
     "permission_denied": "Permission denied for {path}. Close any application that has the file open; if it is in OneDrive or another cloud folder, open it once in Explorer so it is downloaded locally.",
+    "output_denied": "Could not write the result into {folder}. {reason}. If the folder is in OneDrive or another cloud folder, let it finish syncing and retry, or choose a different output folder.",
     "run_in_progress": "A batch is already running",
     "nothing_to_slim": "There are no pending files to slim",
     "unauthorised": "Session expired — reload the window",
