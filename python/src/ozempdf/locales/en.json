@@ -36,6 +36,8 @@
     "btn_add_files": "Add PDFs",
     "btn_add_folder": "Add folder",
     "btn_clear": "Clear all",
+    "btn_reset_all": "Reset all",
+    "btn_reset_all_tip": "Clear every saved result so all slimmed files can be slimmed again",
     "col_document": "Document",
     "col_pages": "Pages",
     "col_original": "Original",
@@ -264,6 +266,7 @@
     "run_failed": "Slimming failed",
     "copied": "Copied to clipboard",
     "copy_failed": "Could not copy the message",
+    "reset_all": "Cleared {count} saved result(s) — ready to slim again",
     "optimal": "Already as small as it gets — the original was kept."
   },
   "errors": {

@@ -495,6 +495,10 @@
   function updateQueueHeadings() {
     const { pending, done, totalPages } = queueCounts();
     const size = state.queue.reduce((sum, item) => sum + (item.size || 0), 0);
+    // Reset all exists to re-slim finished files, so it is only useful (and
+    // only enabled) once at least one result exists.
+    const resetAll = $('#btnResetAll');
+    if (resetAll) resetAll.disabled = done.length === 0 || state.run.running;
     const heading = $('#queueTitle');
     const summary = $('#queueSummary');
     if (pending.length && done.length) {
@@ -868,6 +872,20 @@
     // again (step 2 and the results table share this action cell).
     if (!(await retryItem(id))) return;
     if (insp.id === id && $('#inspectorDialog').open) closeDialog('inspectorDialog');
+  }
+
+  async function resetAllItems() {
+    try {
+      const data = await api('/api/queue/reset', {});
+      if (!data.ok) {
+        showToast(t('errors.run_in_progress'), 'warning');
+        return;
+      }
+      setQueue(data.queue);
+      if (data.reset) showToast(t('notices.reset_all', { count: data.reset }), 'success');
+    } catch (error) {
+      showToast(error.message, 'danger');
+    }
   }
 
   /**
@@ -1509,7 +1527,13 @@
     };
     canvas.addEventListener('pointerup', endDrag);
     canvas.addEventListener('pointercancel', endDrag);
-    canvas.addEventListener('wheel', (event) => {
+    // A pointer released outside the window must not leave the page stuck to
+    // the cursor.
+    canvas.addEventListener('lostpointercapture', endDrag);
+    // Delegated: the wheel zooms anywhere in the dialog, not only when the
+    // pointer happens to be over the canvas.
+    $('#inspectorDialog').addEventListener('wheel', (event) => {
+      if (event.target.closest('input, textarea, select')) return;
       event.preventDefault();
       const steps = [100, 200, 400, 800];
       const index = steps.indexOf(insp.zoom);
@@ -1531,8 +1555,10 @@
     $('#pagePrev').addEventListener('click', () => setInspectorPage(insp.page - 1));
     $('#pageNext').addEventListener('click', () => setInspectorPage(insp.page + 1));
     $('#pageInput').addEventListener('change', (event) => setInspectorPage(Number(event.target.value) || 1));
-    $$('#zoomPills [data-zoom]').forEach((button) => {
-      button.addEventListener('click', () => setInspectorZoom(Number(button.dataset.zoom)));
+    // Delegated so the pills keep working even if the header is rebuilt.
+    $('#zoomPills').addEventListener('click', (event) => {
+      const pill = event.target.closest('[data-zoom]');
+      if (pill) setInspectorZoom(Number(pill.dataset.zoom));
     });
     $('#btnInspectorReset').addEventListener('click', resetInspector);
     $('#btnInspectorOpen').addEventListener('click', () => {
@@ -1712,6 +1738,7 @@
       $(selector).addEventListener('click', openFolder)
     );
     $('#btnClear').addEventListener('click', clearQueue);
+    $('#btnResetAll').addEventListener('click', resetAllItems);
 
     // Queue delegation
     $('#queueBody').addEventListener('click', (event) => {

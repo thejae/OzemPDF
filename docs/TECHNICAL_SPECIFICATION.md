@@ -1014,7 +1014,8 @@ The canvas paints the slimmed page on the right and the original on the left, cl
 draggable handle sit on the seam; corner badges read `ORIGINAL (size)` and
 `SLIMMED (size • -pct% • vectors 100% crisp)`, or `PREVIEW (…)` when no output exists yet.
 
-Interaction: dragging near the divider wipes, dragging elsewhere pans, the wheel zooms, and the keys
+Interaction: dragging near the divider wipes, dragging elsewhere pans, the wheel zooms (anywhere in
+the dialog except over a text field), and the keys
 `←`/`→` step pages, `+`/`=`/`-` zoom and `R` resets. Pages are rendered by `/api/page` with
 `scale = clamp(1.15 * (zoom/200), 0.5, 3400/longest_side)` so a huge page cannot stall the dialog.
 The footer holds the wipe slider (2–98), the percentage readout, a pan hint, `Open file` and `Done`.
@@ -1655,7 +1656,7 @@ route below requires the session token except `/api/bootstrap` and the static fi
 | `/static/*`, `/fonts/*` | GET | CSS, JS and font files |
 | `/api/bootstrap` | GET | version, language, catalog list, presets, persisted config, queue |
 | `/api/queue/add` | POST | add paths; returns accepted rows and `skipped[]` with localized reasons |
-| `/api/queue/remove`, `/api/queue/clear`, `/api/queue/retry` | POST | queue edits |
+| `/api/queue/remove`, `/api/queue/clear`, `/api/queue/retry`, `/api/queue/reset` | POST | queue edits (`reset` clears every completed row's result and returns the count) |
 | `/api/run/start`, `/api/run/stop` | POST | begin or cooperatively stop a batch |
 | `/api/run` | GET | live state: rows, progress, results, summary |
 | `/api/config` | POST | set knobs; the response echoes the clamped values |

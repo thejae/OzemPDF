@@ -4,6 +4,26 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.9 — 2026-11-25
+
+### Added
+
+- **Reset all in Configure & queue.** Once at least one file has been slimmed, the queue panel
+  offers `Reset all` beside `Clear all`: every saved result is cleared and every finished row
+  returns to `Queued — ready to slim`, so a whole batch can be retried with different settings
+  without clicking each row. It stays disabled while there is no result and during a run, a toast
+  reports how many results were cleared, and the same work is available over
+  `POST /api/queue/reset`. Covered by `test_reset_all_returns_every_result_to_the_queue`.
+
+### Changed
+
+- **Zoom is reachable anywhere in the inspector, and survives a rebuilt header.** The wheel handler
+  moved from the page canvas to the dialog, so scrolling over the header, the corner badges or the
+  footer also steps the zoom; wheel over the page-number field is ignored so it cannot hijack typing.
+  The zoom pills are handled by delegation instead of one listener per button, a pointer released
+  outside the window clears the drag state, and a replaced header can no longer leave the zoom
+  buttons dead.
+
 ## 0.3.8 — 2026-11-25
 
 ### Added

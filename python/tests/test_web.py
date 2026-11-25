@@ -78,7 +78,7 @@ def test_index_serves_ui_and_sets_session_cookie(live) -> None:
     status, body, _headers = client.get("/api/bootstrap")
     assert status == 200
     payload = _json(body)
-    assert payload["version"] == "0.3.8"
+    assert payload["version"] == "0.3.9"
     assert "header.step1" in payload["strings"]
     assert payload["queue"] == []
 
@@ -387,6 +387,42 @@ def test_reset_returns_a_slimmed_row_to_the_queue(live, assets, tmp_path: Path) 
     assert second["queue"][0]["status"] == "done"
     assert second["queue"][0]["result"]["reduction_percent"] > 0
     assert (output_dir / assets.ui.name).is_file()
+
+
+def test_reset_all_returns_every_result_to_the_queue(live, assets, tmp_path: Path) -> None:
+    """The bulk reset clears only completed rows and can be repeated safely."""
+    _state, base = live
+    client = Client(base)
+    client.get("/")
+    output_dir = tmp_path / "out"
+    client.post(
+        "/api/config",
+        {"config": {"output_mode": "folder", "output_dir": str(output_dir), "preset": "balanced"}},
+    )
+    _status, body, _headers = client.post(
+        "/api/queue/add", {"paths": [str(assets.ui), str(assets.tiny)]}
+    )
+    ids = [row["id"] for row in _json(body)["queue"]]
+    _status, body, _headers = client.get("/api/bootstrap")
+    config = _json(body)["config"]
+    client.post("/api/run/start", {"ids": ids, "config": config})
+    for _ in range(300):
+        _status, body, _headers = client.get("/api/run")
+        run = _json(body)
+        if not run["running"]:
+            break
+        time.sleep(0.2)
+    assert {row["status"] for row in run["queue"]} == {"done"}
+
+    status, body, _headers = client.post("/api/queue/reset", {})
+    payload = _json(body)
+    assert status == 200 and payload["ok"] is True
+    assert payload["reset"] == len(ids)
+    assert all(row["status"] == "queued" and row["result"] is None for row in payload["queue"])
+
+    # Nothing left to reset: it reports zero rather than failing.
+    _status, body, _headers = client.post("/api/queue/reset", {})
+    assert _json(body)["reset"] == 0
 
 
 def test_ui_language_switch(live) -> None:

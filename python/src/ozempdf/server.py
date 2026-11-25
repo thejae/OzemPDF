@@ -223,6 +223,19 @@ class AppState:
             item.update(status="queued", result=None, error="")
             return True
 
+    def reset_results(self) -> int | None:
+        """Return every completed row to the queue; ``None`` while a run is live."""
+        with self.lock:
+            if self.running:
+                return None
+            reset = 0
+            for item in self.items.values():
+                if item["status"] != "done":
+                    continue
+                item.update(status="queued", result=None, error="")
+                reset += 1
+            return reset
+
     def queue_view(self) -> list[dict]:
         with self.lock:
             return [self._item_view(self.items[key]) for key in self.order if key in self.items]
@@ -539,6 +552,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/queue/remove": self._api_remove,
                 "/api/queue/clear": self._api_clear,
                 "/api/queue/retry": self._api_retry,
+                "/api/queue/reset": self._api_reset,
                 "/api/run/start": self._api_start,
                 "/api/run/stop": self._api_stop,
                 "/api/config": self._api_config,
@@ -666,6 +680,16 @@ class Handler(BaseHTTPRequestHandler):
     def _api_retry(self, payload: dict) -> None:
         ok = self.state.retry_item(str(payload.get("id", "")))
         return self._json({"ok": ok, "queue": self.state.queue_view()})
+
+    def _api_reset(self, _payload: dict) -> None:
+        reset = self.state.reset_results()
+        return self._json(
+            {
+                "ok": reset is not None,
+                "reset": reset or 0,
+                "queue": self.state.queue_view(),
+            }
+        )
 
     def _api_start(self, payload: dict) -> None:
         return self._json({**self.state.start_run(payload), "run": self.state.run_view()})
