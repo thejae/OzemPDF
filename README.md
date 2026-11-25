@@ -7,9 +7,9 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](pyproject.toml)
 
-</div>
-
 **Surgical lossless and visually-lossless PDF slimming.**
+
+</div>
 
 OzemPDF makes PDFs smaller without re-distilling pages. It never rasterizes page content and
 never rewrites vector or text operators; it performs object-level surgery on embedded images,
