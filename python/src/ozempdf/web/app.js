@@ -26,7 +26,7 @@
   }
 
   const state = {
-    version: '0.3.0',
+    version: '',
     strings: {},
     languages: [],
     config: {},
@@ -71,11 +71,13 @@
     $$('[data-i18n-placeholder]', root).forEach((node) => {
       node.placeholder = t(node.dataset.i18nPlaceholder);
     });
-    document.title = t('app.window_title', { version: state.version });
-    const versionLabel = $('#versionLabel');
-    if (versionLabel) versionLabel.textContent = `v${state.version}`;
-    const helpVersion = $('#helpVersion');
-    if (helpVersion) helpVersion.textContent = `v${state.version}`;
+    if (state.version) {
+      document.title = t('app.window_title', { version: state.version });
+      const versionLabel = $('#versionLabel');
+      if (versionLabel) versionLabel.textContent = `v${state.version}`;
+      const helpVersion = $('#helpVersion');
+      if (helpVersion) helpVersion.textContent = `v${state.version}`;
+    }
   }
 
   /* ------------------------------------------------------------------ */

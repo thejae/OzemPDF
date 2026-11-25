@@ -360,8 +360,9 @@ Aggregation helpers: `__add__` and `add_inplace` (used by `BatchSummary`).
 
 ### 3.6 `FileCompressionResult`
 
-The unit of reporting for one file. Derived properties: `bytes_saved = max(0, original -
-compressed)` and `reduction_percent`. `to_dict()` yields the schema in
+The unit of reporting for one file. Derived properties: `bytes_saved` is `max(0, original -
+compressed)` for a successful file and `0` for a failed one (a failure produces no output), with
+`reduction_percent` following it. `to_dict()` yields the schema in
 [Appendix B.1](#b1-filecompressionresult). Fields, in order: `input_path`, `output_path`, `success`,
 `error_message`, `page_count`, `original_bytes`, `compressed_bytes`, `before_breakdown`,
 `after_breakdown`, `images_inspected`, `images_optimized`, `opaque_smasks_stripped`,
@@ -732,7 +733,8 @@ cancel prevents unstarted files from ever running.
 
 ### 5.5 Aggregation
 
-`BatchSummary` byte aggregates exclude failed files; a failure contributes to `failed_count` only.
+`BatchSummary` byte aggregates exclude failed files; a failure contributes to `failed_count` only,
+and its `FileCompressionResult` reports `bytes_saved: 0` and `reduction_percent: 0.0`.
 `aggregate_before_breakdown` / `aggregate_after_breakdown` sum successful results, and
 `protection_removed_count` counts documents whose restrictions were removed.
 
@@ -911,8 +913,9 @@ active step is marked with `aria-current="step"`; a completed step keeps a succe
 `<header class="app-header">`, one row, three zones:
 
 - **Brand** — a 32 px accent tile with the document mark, the wordmark, and a version chip. The chip
-  is rendered from `state.version` (`v0.3.3`) by `applyI18n()`, never hardcoded; a test asserts the
-  static fallback in `index.html` matches `_version.py`.
+  is rendered from `state.version` by `applyI18n()` and is never hardcoded: `app.js` starts with an
+  empty version so only the API can supply it, and `test_static_version_label_matches_package_version`
+  plus `test_ui_script_has_no_hardcoded_version` guard both static fallbacks.
 - **Stepper** — three buttons (`1. Add PDFs`, `2. Configure & Queue`, `3. Slimmed Results`) with
   connector rules. The active step gets an accent underline and an accent badge; passed steps get a
   success tick.

@@ -4,6 +4,20 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.15 — 2026-11-25
+
+### Fixed
+
+- **A failed file no longer reports 100 % savings.** `FileCompressionResult.bytes_saved` ignored
+  `success`, so a document that could not be opened (empty, truncated beyond recovery, wrong
+  password) was serialised with `compressed_bytes: 0`, `bytes_saved` equal to its whole size and
+  `reduction_percent: 100.0`, although no output existed. Failed results now report zero savings;
+  the batch totals already excluded them. Covered by `test_failed_file_reports_no_savings`.
+- **The UI script no longer carries a stale version literal.** `app.js` initialised its
+  `state.version` to `0.3.0` — dead before the bootstrap response, but a second static fallback
+  that the drift test never inspected. It now starts empty so only the version reported by the API
+  is rendered, and `test_ui_script_has_no_hardcoded_version` fails if a literal returns.
+
 ## 0.3.14 — 2026-11-25
 
 ### Added

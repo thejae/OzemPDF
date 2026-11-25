@@ -261,6 +261,19 @@ def _run_cli(argv: list[str]) -> tuple[int, str, str]:
     return code, out.getvalue(), err.getvalue()
 
 
+def test_failed_file_reports_no_savings(tmp_path: Path) -> None:
+    """A file that fails contributes to failed_count only (FR-BAT-9)."""
+    broken = tmp_path / "broken.pdf"
+    broken.write_bytes(b"")
+    summary = run_batch_compression([(broken, None)], CompressionConfig.from_preset("balanced"))
+    result = summary.results[0]
+    assert not result.success
+    assert result.bytes_saved == 0
+    assert result.reduction_percent == 0.0
+    assert result.to_dict()["bytes_saved"] == 0
+    assert result.to_dict()["reduction_percent"] == 0.0
+
+
 def test_cli_single_file_and_json_report(assets, tmp_path: Path) -> None:
     output = tmp_path / "out"
     report = tmp_path / "reports" / "result.json"

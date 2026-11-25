@@ -86,12 +86,14 @@ class FileCompressionResult:
 
     @property
     def bytes_saved(self) -> int:
-        """Bytes removed, floored at zero (a signed output may be larger)."""
+        """Bytes removed, floored at zero; a failed file produced no output."""
+        if not self.success:
+            return 0
         return max(0, self.original_bytes - self.compressed_bytes)
 
     @property
     def reduction_percent(self) -> float:
-        """Percentage of the original removed, 0 when nothing was saved."""
+        """Percentage of the original removed, 0 when nothing was saved or the file failed."""
         if self.original_bytes <= 0:
             return 0.0
         return round(self.bytes_saved / self.original_bytes * 100, 2)
