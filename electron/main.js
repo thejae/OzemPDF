@@ -25,7 +25,7 @@ const START_TIMEOUT_MS = 30000;
  * folder can be moved or deleted as a unit and nothing is left in the user
  * profile. macOS/Linux app bundles are not reliably writable, so packaged
  * builds there keep Electron's normal userData location. A source checkout
- * uses `app/.dev-data/`, which is git-ignored.
+ * uses `electron/.dev-data/`, which is git-ignored.
  */
 const PORTABLE = app.isPackaged && process.platform === 'win32';
 const DATA_DIR = PORTABLE
@@ -80,7 +80,7 @@ function engineCommand() {
   const exeName = process.platform === 'win32' ? 'ozempdf-engine.exe' : 'ozempdf-engine';
   const root = app.isPackaged
     ? path.join(process.resourcesPath, 'engine')
-    : path.join(repoRoot(), 'dist', 'engine');
+    : path.join(repoRoot(), 'artifacts', 'dist', 'engine');
   // Directory builds are preferred (no temp extraction); a one-file build is
   // still accepted for anyone who packages that way.
   const candidates = [
@@ -116,7 +116,7 @@ function startEngine() {
   if (spec.python) {
     const srcDir = app.isPackaged
       ? path.join(process.resourcesPath, 'engine', 'src')
-      : path.join(repoRoot(), 'src');
+      : path.join(repoRoot(), 'python', 'src');
     env.PYTHONPATH = srcDir + (env.PYTHONPATH ? path.delimiter + env.PYTHONPATH : '');
   }
   log(`engine command=${spec.command} args=${JSON.stringify(spec.args)} cwd=${spec.cwd}`);

@@ -13,6 +13,17 @@ font programs, deflate streams, metadata and the cross-reference structure.
 - **The interface is plain HTML/CSS/JS**, served by the Python engine and wrapped by an Electron
   window on Windows, macOS and Linux.
 
+## Quick start — launch the app
+
+| What you want | Where to go |
+| --- | --- |
+| Use the packaged Windows app | extract `release/OzemPDF-<version>-win.zip` to a writable folder and run `OzemPDF.exe` |
+| Run the desktop shell from source | `cd electron && npm install && npm start` (after `pip install -e ".[dev]"`) |
+| Run without Node or Electron | `ozempdf --serve` |
+
+`electron/` is only the desktop shell; the application logic is the Python engine in
+`python/src/ozempdf/`.
+
 ![Dropping PDFs on the working table](docs/screenshots/step1.png)
 
 ![The queue and compression card](docs/screenshots/step2.png)
@@ -71,7 +82,7 @@ python -m venv .venv
 # POSIX:   source .venv/bin/activate
 pip install -e ".[dev]"
 
-cd app
+cd electron
 npm install
 npm start
 ```
@@ -92,7 +103,7 @@ there as expected.
 
 ### Windows: portable, no installer
 
-The Windows build is a single **portable ZIP**: `app/release/OzemPDF-0.3.3-win.zip`. There is no
+The Windows build is a single **portable ZIP**: `release/OzemPDF-0.3.3-win.zip`. There is no
 installer, no registry entry, no Program Files copy and no uninstaller. Extract it anywhere
 writable (for example `D:\OzemPDF`) and run from there; do not run it from inside the ZIP.
 
@@ -181,7 +192,7 @@ destination folder and are promoted with an atomic replace; a crash leaves the o
 
 ## Localization
 
-Every user-facing string — including `--help` — comes from `src/ozempdf/locales/<code>.json`.
+Every user-facing string — including `--help` — comes from `python/src/ozempdf/locales/<code>.json`.
 Adding a language is copying `en.json`, translating the values, keeping the `_meta` block accurate,
 and restarting. Missing keys fall back to English and never render raw key names. The interface
 switches language live and remembers the choice.
@@ -201,8 +212,8 @@ API, locale key coverage, and that signing produces a real signature.
 ## Packaging
 
 ```bash
-python build_cross_platform.py   # frozen engine -> dist/engine/ozempdf-engine/ozempdf-engine[.exe]
-cd app && npm run dist           # portable ZIP -> app/release/OzemPDF-<version>-win.zip
+python python/scripts/build_cross_platform.py   # frozen engine -> artifacts/dist/engine/ozempdf-engine/ozempdf-engine[.exe]
+cd electron && npm run dist                     # portable ZIP -> release/OzemPDF-<version>-win.zip
 ```
 
 The engine is a PyInstaller directory build carrying `locales/`, `web/` and fonts; the Electron
@@ -217,13 +228,20 @@ self-extracting portable exe, so nothing is written to the system temp directory
 ## Repository layout
 
 ```
-src/ozempdf/            Python engine, CLI, HTTP server, locales, web UI
-src/ozempdf/web/        index.html, styles.css, app.js, fonts
-app/                    Electron main + preload and packaging config
-tests/                  pytest suite and synthetic fixtures
-docs/                   user stories, technical specification, discrepancy ledger
-PRODUCT.md / DESIGN.md  product truth and the design system
+electron/               Electron main + preload, launchers, icon assets, packaging config
+python/src/ozempdf/     Python engine, CLI, HTTP server, locales, web UI
+python/src/ozempdf/web/ index.html, styles.css, app.js, fonts
+python/tests/           pytest suite and synthetic fixtures
+python/scripts/         PyInstaller driver, engine entry point, icon generator
+docs/                   user stories, specification, ledger, changelog, design and product truth
+release/                generated portable ZIP (ignored)
+artifacts/              generated output (ignored): build/ is PyInstaller scratch, dist/ the frozen engine
 ```
+
+Only `release/` and `artifacts/` are build output; `build/` inside `artifacts/` is disposable
+scratch and `dist/` holds the frozen engine that `electron/` packages as `resources/engine`.
+Dependency manifests — `pyproject.toml` for Python and `electron/package.json` for Node — are the
+source of truth; [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) is the human-readable inventory.
 
 ## Known limitations
 
@@ -238,9 +256,10 @@ Three documents describe the project in depth: [`docs/TECHNICAL_SPECIFICATION.md
 (the current-state specification of the engine, CLI, API and interface),
 [`docs/USER_STORIES.md`](docs/USER_STORIES.md) (personas, epics, acceptance criteria, traceability) and
 [`docs/DISCREPANCIES.md`](docs/DISCREPANCIES.md) (every defect from the previous PySide6 architecture,
-how it was resolved, and what the rebuild introduced).
+how it was resolved, and what the rebuild introduced). The third-party inventory — Python, Node and
+the vendored fonts with their licenses — is [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 
 ## License
 
 MIT. Bundled IBM Plex Sans and JetBrains Mono are licensed under the SIL Open Font License; their
-license texts ship in `src/ozempdf/web/fonts/`.
+license texts ship in `python/src/ozempdf/web/fonts/`.

@@ -10,7 +10,7 @@
 
 ## 1. About this document
 
-These stories describe what OzemPDF does **today** (traced through `src/ozempdf/`, `src/ozempdf/locales/en.json`, `README.md` and `tests/`) plus the small number of user-facing gaps that the implementation leaves open. Every story is written so it can be tested without reading the source.
+These stories describe what OzemPDF does **today** (traced through `python/src/ozempdf/`, `python/src/ozempdf/locales/en.json`, `README.md` and `python/tests/`) plus the small number of user-facing gaps that the implementation leaves open. Every story is written so it can be tested without reading the source.
 
 | Field | Meaning |
 | --- | --- |
@@ -23,8 +23,8 @@ Stories are numbered `US-001 … US-058`. IDs are stable — reference them in c
 
 > **Architecture note (v0.3.3).** These stories are the durable contract and remain authoritative;
 > the notes under each story were rewritten to name what implements it today. The interface is plain
-> HTML, CSS and JavaScript in `src/ozempdf/web/`, served over a loopback HTTP API by
-> `src/ozempdf/server.py` and wrapped by the Electron shell in `app/`. The engine, the CLI and the
+> HTML, CSS and JavaScript in `python/src/ozempdf/web/`, served over a loopback HTTP API by
+> `python/src/ozempdf/server.py` and wrapped by the Electron shell in `electron/`. The engine, the CLI and the
 > invariants are unchanged. Every story is Shipped, including the five that were Proposed/Partial in
 > v0.1.0 (US-004, US-036, US-051, US-052, US-053) and four added at v0.3.x for behaviour that had
 > shipped without a written story (US-055 … US-058).
@@ -527,7 +527,7 @@ Stories are numbered `US-001 … US-058`. IDs are stable — reference them in c
 - **Given** the app itself, **then** every user-facing string comes from the catalog — no string is hardcoded in a widget.
 - **Given** a locale is set through the environment, **then** that locale is used on start when a catalog for it exists.
 
-**Notes** — No compilation step; catalogs live in `src/ozempdf/locales/` and are discovered at runtime; fallback is `en.json`.
+**Notes** — No compilation step; catalogs live in `python/src/ozempdf/locales/` and are discovered at runtime; fallback is `en.json`.
 
 ### US-036 · Keep my setup between launches
 **Epic:** E8 · **Persona:** Sam · **Priority:** Should · **Status:** Shipped (v0.3.0)
@@ -850,7 +850,7 @@ Signing is off by default and never part of a preset.
   anywhere.
 
 **Notes** — `settings._portable_data_dir` (override → frozen-engine walk-up → platform location) and
-`app/main.js` (redirects Electron's `userData`, `sessionData`, `crashDumps` and the process temp
+`electron/main.js` (redirects Electron's `userData`, `sessionData`, `crashDumps` and the process temp
 directory). Verified by extracting the ZIP outside the development workspace and launching it.
 
 ### US-058 · Use the browser when the desktop window cannot start
@@ -898,13 +898,13 @@ check in `server.py`. Same UI files as the desktop app: there is no second imple
 | E8 Appearance | `web/styles.css` tokens, `app.js` (`applyI18n`) | `i18n.py`, `settings.py`, `locales/en.json`, `/api/ui` |
 | E9 CLI | `cli.py` | `engine/batch.py` (`BatchSummary.to_dict`) |
 | E10 Engine | drawer flags and consent dialogs | `engine/unlock.py`, `analyzer.py`, `deduplicator.py`, `image_optimizer.py`, `font_optimizer.py`, `stream_optimizer.py`, `signing.py`, `pipeline.py` |
-| E11 Trust | `app.js` close guard, portable notice | `engine/pipeline.py` (atomic write + guardrail), `settings.py` (portable dir), `app/main.js` |
+| E11 Trust | `app.js` close guard, portable notice | `engine/pipeline.py` (atomic write + guardrail), `settings.py` (portable dir), `electron/main.js` |
 
-Automated coverage maps to these stories: `tests/test_lossless.py` (US-042, US-043, US-044),
-`tests/test_visually_lossless.py` (US-030, US-045), `tests/test_security_and_fonts.py` (US-046,
-US-047, US-051, US-055, US-056), `tests/test_batch.py` (US-003, US-014, US-019, US-020, US-038,
-US-039, US-041), `tests/test_settings.py` (US-036, US-057), `tests/test_i18n.py` (US-035, US-037),
-`tests/test_web.py` (US-001, US-004, US-021, US-026, US-034, US-053, US-058).
+Automated coverage maps to these stories: `python/tests/test_lossless.py` (US-042, US-043, US-044),
+`python/tests/test_visually_lossless.py` (US-030, US-045), `python/tests/test_security_and_fonts.py` (US-046,
+US-047, US-051, US-055, US-056), `python/tests/test_batch.py` (US-003, US-014, US-019, US-020, US-038,
+US-039, US-041), `python/tests/test_settings.py` (US-036, US-057), `python/tests/test_i18n.py` (US-035, US-037),
+`python/tests/test_web.py` (US-001, US-004, US-021, US-026, US-034, US-053, US-058).
 
 ---
 
@@ -946,12 +946,12 @@ US-039, US-041), `tests/test_settings.py` (US-036, US-057), `tests/test_i18n.py`
 owner-visible scope.
 
 **Done** — additionally, per this repo's `AGENTS.md`:
-- No user-facing string is hardcoded; every new key exists in `src/ozempdf/locales/en.json` and no
+- No user-facing string is hardcoded; every new key exists in `python/src/ozempdf/locales/en.json` and no
   orphan key remains (tested).
 - Both themes are verified at desktop and mobile widths for any touched surface, and the layout
   survives the 1080/860/700/480 px breakpoints.
 - The three-step progressive-disclosure flow, keyboard access and reduced motion still hold, and the
   vector/never-grow invariants are untouched.
-- `python -m pytest -q` and `ruff check src tests` pass; `node --check` passes for touched scripts.
-- `_version.py` and `CHANGELOG.md` are updated, the portable Windows ZIP builds, and one atomic
+- `python -m pytest -q` and `ruff check python/src python/tests` pass; `node --check` passes for touched scripts.
+- `python/src/ozempdf/_version.py` and `docs/CHANGELOG.md` are updated, the portable Windows ZIP builds, and one atomic
   conventional, GPG-signed commit records the change.

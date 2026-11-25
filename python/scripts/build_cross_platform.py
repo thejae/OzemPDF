@@ -1,13 +1,13 @@
 """Build the frozen Python engine that the Electron shell ships as a sidecar.
 
 Usage:
-    python build_cross_platform.py
+    python python/scripts/build_cross_platform.py
 
 Output:
-    dist/engine/ozempdf-engine/ozempdf-engine[.exe]
+    artifacts/dist/engine/ozempdf-engine/ozempdf-engine[.exe]
 
 Then package the desktop app:
-    cd app && npm install && npm run dist
+    cd electron && npm install && npm run dist
 """
 
 from __future__ import annotations
@@ -18,9 +18,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-SRC = ROOT / "src"
-DIST = ROOT / "dist" / "engine"
+ROOT = Path(__file__).resolve().parents[2]
+SRC = ROOT / "python" / "src"
+DIST = ROOT / "artifacts" / "dist" / "engine"
 REQUIRED_MODULES = (
     "pikepdf",
     "PIL",
@@ -75,9 +75,9 @@ def build() -> Path:
         "--distpath",
         str(DIST),
         "--workpath",
-        str(ROOT / "build" / "pyinstaller"),
+        str(ROOT / "artifacts" / "build" / "pyinstaller"),
         "--specpath",
-        str(ROOT / "build"),
+        str(ROOT / "artifacts" / "build"),
         "--paths",
         str(SRC),
         "--collect-all",
@@ -115,7 +115,7 @@ def build() -> Path:
     ]
     for source, destination in data:
         command += ["--add-data", f"{source}{separator}{destination}"]
-    command.append(str(ROOT / "scripts" / "engine_entry.py"))
+    command.append(str(ROOT / "python" / "scripts" / "engine_entry.py"))
 
     print(" ".join(command))
     result = subprocess.run(command, cwd=ROOT)
@@ -127,7 +127,7 @@ def build() -> Path:
     if not binary.is_file():
         raise SystemExit(f"Expected binary not found: {binary}")
     print(f"\nEngine built: {binary}")
-    print("Next: cd app && npm install && npm run dist")
+    print("Next: cd electron && npm install && npm run dist")
     return binary
 
 

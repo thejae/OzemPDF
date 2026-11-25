@@ -4,15 +4,16 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+artifacts/
 .venv/
 .venv_win/
 .pytest_cache/
 .ruff_cache/
 
 # Node / Electron
-app/node_modules/
-app/release/
-app/.dev-data/
+electron/node_modules/
+electron/.dev-data/
+release/
 npm-debug.log*
 
 # Generated visual artefacts

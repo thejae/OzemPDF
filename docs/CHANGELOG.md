@@ -4,6 +4,19 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- **Repository restructured for a clear launch path and uncrowded root.** The Electron shell moved
+  from `app/` to `electron/` (with `launcher/` → `launchers/` and `build/` → `assets/`), authored
+  Python moved under `python/` (`src/`, `tests/`, `scripts/`), project documentation moved under
+  `docs/` (`CHANGELOG.md`, `DESIGN.md`, `PRODUCT.md`), the portable ZIP is written to `release/`, and
+  PyInstaller scratch/output moved to `artifacts/build/` and `artifacts/dist/`. The root now lists
+  only the source groups, generated outputs and conventional project files. Command paths and the
+  build script follow the move; the shipped engine and ZIP contents are unchanged. Third-party
+  manifests are indexed in `docs/DEPENDENCIES.md`.
+
 ## 0.3.3 — 2026-11-24
 
 ### Changed

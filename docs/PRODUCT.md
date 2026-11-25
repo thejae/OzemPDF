@@ -40,7 +40,7 @@ Name OzemPDF, version line v0.3.3. The product's voice is precise and quiet: it 
 
 ## Evidence on Hand
 
-`docs/USER_STORIES.md` (54 stories, 11 epics, five personas) and `docs/TECHNICAL_SPECIFICATION.md` (pipeline, invariants, 21 recorded discrepancies) are the normative evidence. No customer logos, testimonials, benchmarks or press assets exist; none may be fabricated. There are no brand fonts or logo files on hand — typography and marks are established by the design system.
+`USER_STORIES.md` (54 stories, 11 epics, five personas) and `TECHNICAL_SPECIFICATION.md` (pipeline, invariants, 21 recorded discrepancies) are the normative evidence. No customer logos, testimonials, benchmarks or press assets exist; none may be fabricated. There are no brand fonts or logo files on hand — typography and marks are established by the design system.
 
 ## Product Principles
 

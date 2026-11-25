@@ -1,6 +1,6 @@
 """Desktop entry point retained for the ``ozempdf-gui`` script.
 
-The desktop experience is the local web app; the Electron shell in ``app/``
+The desktop experience is the local web app; the Electron shell in ``electron/``
 wraps it, and this function lets the console script launch the same surface.
 """
 

@@ -19,8 +19,8 @@
     "appId": "io.ozempdf.app",
     "productName": "OzemPDF",
     "directories": {
-      "output": "release",
-      "buildResources": "build"
+      "output": "../release",
+      "buildResources": "assets"
     },
     "files": [
       "main.js",
@@ -29,7 +29,7 @@
     ],
     "extraResources": [
       {
-        "from": "../dist/engine",
+        "from": "../artifacts/dist/engine",
         "to": "engine",
         "filter": [
           "**/*"
@@ -38,11 +38,11 @@
     ],
     "extraFiles": [
       {
-        "from": "launcher/Start OzemPDF (compatibility).cmd",
+        "from": "launchers/Start OzemPDF (compatibility).cmd",
         "to": "Start OzemPDF (compatibility).cmd"
       },
       {
-        "from": "launcher/Start OzemPDF in browser.cmd",
+        "from": "launchers/Start OzemPDF in browser.cmd",
         "to": "Start OzemPDF in browser.cmd"
       }
     ],
@@ -50,14 +50,14 @@
       "target": [
         "zip"
       ],
-      "icon": "build/icon.ico"
+      "icon": "assets/icon.ico"
     },
     "mac": {
       "target": [
         "dmg"
       ],
       "category": "public.app-category.productivity",
-      "icon": "build/icon.png"
+      "icon": "assets/icon.png"
     },
     "linux": {
       "target": [
@@ -65,7 +65,7 @@
         "deb"
       ],
       "category": "Office",
-      "icon": "build/icon.png"
+      "icon": "assets/icon.png"
     }
   },
   "allowScripts": {

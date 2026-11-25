@@ -5,11 +5,11 @@
 | Document ID | OZEM-TS-001 |
 | Product | OzemPDF |
 | Specification version | 2.0 |
-| Application version described | **0.3.3** (`src/ozempdf/_version.py`) |
+| Application version described | **0.3.3** (`python/src/ozempdf/_version.py`) |
 | Document status | Current-state specification (descriptive + normative for invariants) |
 | Last updated | 2026-11-24 |
 | Audience | Maintainers, integrators, reviewers, AI coding agents |
-| Related documents | [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), [`CHANGELOG.md`](../CHANGELOG.md), [`DESIGN.md`](../DESIGN.md), [`PRODUCT.md`](../PRODUCT.md), [`docs/DISCREPANCIES.md`](DISCREPANCIES.md), [`pyproject.toml`](../pyproject.toml) |
+| Related documents | [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), [`CHANGELOG.md`](CHANGELOG.md), [`DESIGN.md`](DESIGN.md), [`PRODUCT.md`](PRODUCT.md), [`DISCREPANCIES.md`](DISCREPANCIES.md), [`DEPENDENCIES.md`](DEPENDENCIES.md), [`pyproject.toml`](../pyproject.toml) |
 
 > **Architecture history.** Versions up to 0.2.0 shipped a PySide6 desktop GUI. From 0.3.0 the
 > presentation layer is plain HTML/CSS/JavaScript served by the Python engine over a loopback HTTP
@@ -20,7 +20,7 @@
 
 > **Authority.** This document describes the implementation as it exists in source at version 0.3.3.
 > Where prose in the README or a locale catalog disagrees with observable behaviour, the behaviour of
-> `src/ozempdf/**` is authoritative and the disagreement is recorded in
+> `python/src/ozempdf/**` is authoritative and the disagreement is recorded in
 > [§16](#16-defect-ledger-and-known-limitations). Normative project rules live in
 > [`AGENTS.md`](../AGENTS.md); this specification restates them and adds precision, it does not relax
 > them.
@@ -118,7 +118,7 @@ Out of scope:
 | Console script `ozempdf` | `ozempdf.__main__:main` → `ozempdf.cli:run_cli` | Shell, CI, scripts |
 | Local server | `ozempdf --serve [--port N] [--no-browser]` | Browser fallback, development, tests |
 | Module execution | `python -m ozempdf` | Development |
-| Frozen engine | PyInstaller `dist/engine/ozempdf-engine/ozempdf-engine.exe` | Bundled inside the desktop app |
+| Frozen engine | PyInstaller `artifacts/dist/engine/ozempdf-engine/ozempdf-engine.exe` | Bundled inside the desktop app |
 
 Invoking `ozempdf` with **no arguments** launches the interface. In a checkout that means starting
 the local server and opening the default browser; in the packaged app the Electron shell does it. The
@@ -256,7 +256,7 @@ class OutputMode(str, Enum):
 Balanced; `custom` has no stored definition and is produced only by editing a knob at runtime. A
 typed caller passing the enum gets that enum's configuration — `str()` of a `str`-Enum is not its
 value on Python 3.11+, which is why the branch exists and why
-`tests/test_settings.py::test_from_preset_accepts_an_enum_member` covers it.
+`python/tests/test_settings.py::test_from_preset_accepts_an_enum_member` covers it.
 
 ### 3.2 `CompressionConfig`
 
@@ -565,7 +565,7 @@ zlib-wrapped deflate stream, i.e. `/FlateDecode` compatible.
 Row-adaptive encoder producing `height` rows of `[filter_byte][stride bytes]` from **all five** PNG
 filters — None, Sub, Up, Average, Paeth — selected per row by the libpng heuristic (minimum sum of
 absolute signed residuals, `b if b < 128 else 256 - b`). `bpp` is 1 for Gray/Indexed and 3 for RGB.
-Round-trip and reference-value tests live in `tests/test_visually_lossless.py` (D-02).
+Round-trip and reference-value tests live in `python/tests/test_visually_lossless.py` (D-02).
 
 Work is bounded so a pathological scan cannot stall a batch: the predictor loop is capped at 4 MP in
 Mode A, and candidate 3 is offered only at ≤ 1.5 MP.
@@ -822,15 +822,15 @@ English literals in the parser.
 
 The presentation layer is plain HTML, CSS and JavaScript served by the Python engine over a
 loopback HTTP server. There is no framework, no build step and no bundler: the files in
-`src/ozempdf/web/` are shipped verbatim and served as static assets. Two shells wrap the same UI:
+`python/src/ozempdf/web/` are shipped verbatim and served as static assets. Two shells wrap the same UI:
 
 | Shell | Entry point | Use |
 | --- | --- | --- |
-| Desktop app | `OzemPDF.exe` → `app/main.js` → spawns the frozen engine → loads its URL in Electron | Normal use on Windows, macOS, Linux |
+| Desktop app | `OzemPDF.exe` → `electron/main.js` → spawns the frozen engine → loads its URL in Electron | Normal use on Windows, macOS, Linux |
 | Browser | `python -m ozempdf --serve` (or the packaged `Start OzemPDF in browser.cmd`) | Hosts that block the Electron sandbox; no Electron at all |
 
 Because both shells talk to the same local API, there is exactly one implementation of every
-interaction and one set of tests (`tests/test_web.py`) covering them.
+interaction and one set of tests (`python/tests/test_web.py`) covering them.
 
 ### 7.1 Startup handshake
 
@@ -841,7 +841,7 @@ one line to stdout and then serves:
 OZEMPDF_READY {"port": 51234, "url": "http://127.0.0.1:51234/?token=…"}
 ```
 
-`app/main.js` waits for that line, extracts the URL and calls `loadURL`. The token is also set as an
+`electron/main.js` waits for that line, extracts the URL and calls `loadURL`. The token is also set as an
 `HttpOnly`-equivalent session cookie (`ozempdf_token`) by the first navigation, so the page can call
 the API without embedding the secret in every request. A ready line that never arrives is a startup
 failure and is reported in `data/main.log`.
@@ -1035,7 +1035,7 @@ work without a custom key handler. The help dialog lists the same table.
 
 - Location: `data/settings.json` beside the executable for packaged builds (see
   [§13.3](#133-standalone-builds)); `%APPDATA%/OzemPDF` or `~/.config/OzemPDF` for a source install;
-  `app/.dev-data` for the dev checkout. `OZEMPDF_DATA_DIR` overrides all of it.
+  `electron/.dev-data` for the dev checkout. `OZEMPDF_DATA_DIR` overrides all of it.
 - Write: JSON to `settings.json.tmp`, then `os.replace`; failure is non-fatal.
 - Read: a corrupt or missing file yields `{}`.
 - Persisted: `dark_mode`, `language`, `preset`, `advanced_open`, and the advanced knob subset plus
@@ -1100,7 +1100,7 @@ and `document.title` are updated too. The catalog list in the language `select` 
 
 ### 7.19 Desktop shell (Electron)
 
-`app/main.js`:
+`electron/main.js`:
 
 1. Resolves the engine: `resources/engine/ozempdf-engine/ozempdf-engine.exe` in a packaged build,
    `python -m ozempdf` in a checkout.
@@ -1109,7 +1109,7 @@ and `document.title` are updated too. The catalog list in the language `select` 
    `%APPDATA%` or the system temp directory.
 3. Spawns the engine with `--serve --port 0 --no-browser`, waits for `OZEMPDF_READY`, then loads the
    URL. Startup, engine exit and renderer failures are appended to `data/main.log`.
-4. Exposes only four capabilities through `app/preload.js` with `contextIsolation`: `pickPaths`,
+4. Exposes only four capabilities through `electron/preload.js` with `contextIsolation`: `pickPaths`,
    `openPath`, `showItemInFolder`, `getPathForFile`. There is no `nodeIntegration`, and the renderer
    cannot read arbitrary files.
 5. Intercepts `close` while a run is active, calls `window.__ozemCloseGuard()`, shows a native
@@ -1134,7 +1134,7 @@ fallback rather than a demo.
 
 ### 8.1 Catalog format
 
-UTF-8 JSON, one file per locale: `src/ozempdf/locales/<code>.json`. 19 top-level groups, 282 leaf
+UTF-8 JSON, one file per locale: `python/src/ozempdf/locales/<code>.json`. 19 top-level groups, 282 leaf
 strings at 0.3.3 (Appendix C).
 
 - Reserved `_meta` object: `code`, `name`, `native_name`.
@@ -1170,7 +1170,7 @@ the choice also survives a restart).
 
 ### 8.5 Rules
 
-**FR-I18N-1** No user-facing literal in `src/ozempdf/web/**`, `server.py`, `cli.py` or `engine/*`;
+**FR-I18N-1** No user-facing literal in `python/src/ozempdf/web/**`, `server.py`, `cli.py` or `engine/*`;
 use `t()` in Python and `data-i18n`/`t()` in the UI.
 **FR-I18N-2** Any new or changed string MUST be added to `en.json` in the same change.
 **FR-I18N-3** Locale files MUST remain valid JSON with unique keys and no empty values; all three are
@@ -1381,22 +1381,22 @@ pythonpath = ["src"]
 addopts = "-ra"
 ```
 
-Run `python -m pytest -q` (~10 s, 76 tests) and `ruff check src tests`. Interface tests drive the real
+Run `python -m pytest -q` (~10 s, 76 tests) and `ruff check python/src python/tests`. Interface tests drive the real
 server through `http.client`; no browser is required, and no Qt platform plugin is involved.
 
 ### 12.3 Inventory
 
 | Module | Tests | Verifies |
 | --- | --- | --- |
-| `tests/test_lossless.py` | 9 | Bit-identical pixels *and* identical decoded content bytes in Strict Lossless; guardrail keeps a tiny file (`kept_original_guardrail`, `already_optimal`); duplicate images, opaque `/SMask`, `/PieceInfo` and `/Thumb` removed; Max Slim strips metadata but Lossless keeps it; an image stream is only replaced when strictly smaller; vector-only documents are not rasterised; every preset still renders a page |
-| `tests/test_visually_lossless.py` | 9 | 600 effective DPI derived from the CTM; Balanced downsamples it and Max Slim is not larger; a screenshot becomes `/Indexed` rather than JPEG; a low-DPI image is left alone; Predictor-15 round-trips all five filters for bpp 1 and 3; Paeth matches reference values |
-| `tests/test_security_and_fonts.py` | 15 | Owner-encrypted signed document is decrypted and flattened; permission restrictions removed without a password; a supplied password does not break permission-only files; a mixed batch shares one password; an open password without a credential is reported, not guessed; `"1234"` fails; inputs open read-only; a permission error is actionable; protection is classified; unsupported encryption is reported; flatten-disabled keeps the signature; a subset font is still a valid sfnt; re-signing produces a real `/ByteRange` signature; a wrong certificate password fails cleanly and leaves no output |
-| `tests/test_batch.py` | 15 | Sorted recursive discovery and previous-output exclusion; the three output modes; collision suffixing; empty suffix fallback; parallel ordering and progress; cancel stops dispatch but keeps finished work; thumbnails and page renders; a failed file leaves no temp and keeps the original; CLI single file with a JSON report; pure-JSON stdout; exit codes 1 and 2; localized help; flag mapping |
-| `tests/test_settings.py` | 6 | Whitelist-only persistence and secrets never persisted; portable data-dir override; corrupt and unwritable settings fall back silently; language round-trips through `AppState`; `from_preset` accepts an enum member |
-| `tests/test_i18n.py` | 7 | Translation and fallback; formatting errors return the template; unknown language keeps the current one; discovery and listeners; every static key exists; zero orphan keys; no empty values |
-| `tests/test_web.py` | 15 | Index serves the UI and sets the session cookie; the version chip matches `_version.py`; the API refuses a token-less request; static traversal is blocked; add → run → images; `fs/list` filters and hides; certificate picker; upload staging; a preset change keeps the destination; opening a missing output is reported, not raised; incremental queue after a run; row removal; preload paths queue on first load; protection kind is reported; language switch |
+| `python/tests/test_lossless.py` | 9 | Bit-identical pixels *and* identical decoded content bytes in Strict Lossless; guardrail keeps a tiny file (`kept_original_guardrail`, `already_optimal`); duplicate images, opaque `/SMask`, `/PieceInfo` and `/Thumb` removed; Max Slim strips metadata but Lossless keeps it; an image stream is only replaced when strictly smaller; vector-only documents are not rasterised; every preset still renders a page |
+| `python/tests/test_visually_lossless.py` | 9 | 600 effective DPI derived from the CTM; Balanced downsamples it and Max Slim is not larger; a screenshot becomes `/Indexed` rather than JPEG; a low-DPI image is left alone; Predictor-15 round-trips all five filters for bpp 1 and 3; Paeth matches reference values |
+| `python/tests/test_security_and_fonts.py` | 15 | Owner-encrypted signed document is decrypted and flattened; permission restrictions removed without a password; a supplied password does not break permission-only files; a mixed batch shares one password; an open password without a credential is reported, not guessed; `"1234"` fails; inputs open read-only; a permission error is actionable; protection is classified; unsupported encryption is reported; flatten-disabled keeps the signature; a subset font is still a valid sfnt; re-signing produces a real `/ByteRange` signature; a wrong certificate password fails cleanly and leaves no output |
+| `python/tests/test_batch.py` | 15 | Sorted recursive discovery and previous-output exclusion; the three output modes; collision suffixing; empty suffix fallback; parallel ordering and progress; cancel stops dispatch but keeps finished work; thumbnails and page renders; a failed file leaves no temp and keeps the original; CLI single file with a JSON report; pure-JSON stdout; exit codes 1 and 2; localized help; flag mapping |
+| `python/tests/test_settings.py` | 6 | Whitelist-only persistence and secrets never persisted; portable data-dir override; corrupt and unwritable settings fall back silently; language round-trips through `AppState`; `from_preset` accepts an enum member |
+| `python/tests/test_i18n.py` | 7 | Translation and fallback; formatting errors return the template; unknown language keeps the current one; discovery and listeners; every static key exists; zero orphan keys; no empty values |
+| `python/tests/test_web.py` | 15 | Index serves the UI and sets the session cookie; the version chip matches `_version.py`; the API refuses a token-less request; static traversal is blocked; add → run → images; `fs/list` filters and hides; certificate picker; upload staging; a preset change keeps the destination; opening a missing output is reported, not raised; incremental queue after a run; row removal; preload paths queue on first load; protection kind is reported; language switch |
 
-Fixtures live in `tests/pdf_fixtures.py` (337 lines): flat and gradient rasters, an opaque `/SMask`,
+Fixtures live in `python/tests/pdf_fixtures.py` (337 lines): flat and gradient rasters, an opaque `/SMask`,
 duplicate images, `/PieceInfo`/`/Thumb`/XMP bloat, a synthetic TrueType font built with
 `FontBuilder`, an owner-encrypted PDF with a visible signature widget, an open-password PDF, an
 unsupported-encryption PDF, and a nested folder tree.
@@ -1444,28 +1444,28 @@ pip install -e ".[dev]"
 ozempdf --serve          # interface in the browser
 ```
 
-The Electron shell additionally needs `npm install` inside `app/`.
+The Electron shell additionally needs `npm install` inside `electron/`.
 
 ### 13.3 Standalone builds
 
 Two artefacts, in order:
 
-1. **Frozen engine** — `python build_cross_platform.py` runs PyInstaller with
-   `--onedir --console --name ozempdf-engine --paths src`, adds `locales/` and `web/` (fonts
+1. **Frozen engine** — `python python/scripts/build_cross_platform.py` runs PyInstaller with
+   `--onedir --console --name ozempdf-engine --paths python/src`, adds `locales/` and `web/` (fonts
    included) via `--add-data`, collects `pikepdf`, `pypdfium2` and `zopfli`, and declares the hidden
-   imports the dynamic loaders need. Output: `dist/engine/ozempdf-engine/ozempdf-engine.exe`.
+   imports the dynamic loaders need. Output: `artifacts/dist/engine/ozempdf-engine/ozempdf-engine.exe`.
    `--onefile` was rejected: it extracts to a temp directory at startup and failed with "Could not
    create temporary directory" on locked-down hosts, and a one-dir build also starts faster.
-2. **Desktop app** — `cd app && npm run dist` runs `electron-builder` with the `zip` target only,
-   copying `dist/engine` as `resources/engine` plus the two launchers and the icon. Output:
-   `app/release/OzemPDF-0.3.3-win.zip` (~172 MB).
+2. **Desktop app** — `cd electron && npm run dist` runs `electron-builder` with the `zip` target only,
+   copying `artifacts/dist/engine` as `resources/engine` plus the two launchers and the icon. Output:
+   `release/OzemPDF-0.3.3-win.zip` (~172 MB).
 
 `electron-builder` is configured for `win`, `mac` and `linux` zip targets. NSIS and the
 self-extracting portable exe were **removed**: the installer executes the generated installer to
 extract its uninstaller, which the reference host blocks, and a portable app should not leave an
 installer's traces. The ZIP is the deliverable.
 
-`build_cross_platform.py` performs a pre-flight import check and installs missing dependencies
+`python/scripts/build_cross_platform.py` performs a pre-flight import check and installs missing dependencies
 before building; it never edits the version.
 
 ### 13.4 Portable data
@@ -1474,30 +1474,30 @@ A packaged build owns exactly one writable directory: `data/` beside the executa
 
 - `settings.py` resolves it from `OZEMPDF_DATA_DIR`, else by walking up from the frozen engine to the
   folder containing `resources/` or `OzemPDF.exe`, and creates `data/` there.
-- `app/main.js` redirects `userData`, `sessionData`, `crashDumps` and `TEMP`/`TMP`/`TMPDIR` into the
+- `electron/main.js` redirects `userData`, `sessionData`, `crashDumps` and `TEMP`/`TMP`/`TMPDIR` into the
   same folder and passes `OZEMPDF_DATA_DIR` to the engine, so Electron's caches, its log and the
   engine's temp files all stay inside the copy.
 - A source install uses the platform location (`%APPDATA%/OzemPDF`, `~/.config/OzemPDF`); the dev
-  checkout uses `app/.dev-data`.
+  checkout uses `electron/.dev-data`.
 
 Verified by extracting the ZIP to a folder such as `D:\OzemPDF`, launching `OzemPDF.exe` with no
 flags, and confirming that only `data/` appears next to it and `%APPDATA%\OzemPDF` is untouched
-(`tests/test_settings.py::test_portable_data_dir_override` covers the resolution rule).
+(`python/tests/test_settings.py::test_portable_data_dir_override` covers the resolution rule).
 
 ### 13.5 Versioning and changelog
 
-- Single source of truth: `src/ozempdf/_version.py` (`__version__`, `__version_info__`).
-- The version also appears in `app/package.json`, `package-lock.json`, the README header, the ZIP
+- Single source of truth: `python/src/ozempdf/_version.py` (`__version__`, `__version_info__`).
+- The version also appears in `electron/package.json`, `electron/package-lock.json`, the README header, the ZIP
   name and the interface's version chip (rendered from the API, not hardcoded).
-- `CHANGELOG.md` follows Keep a Changelog with `Added` / `Changed` / `Fixed` / `Removed` per version.
+- `docs/CHANGELOG.md` follows Keep a Changelog with `Added` / `Changed` / `Fixed` / `Removed` per version.
 - **CON-1** Every behaviour change MUST update the changelog and, when the release changes, the
   version (`AGENTS.md`).
 - **CON-2** Commits MUST be atomic, conventional, and GPG-signed.
 
 ### 13.6 Release checklist
 
-1. `python -m pytest -q` and `ruff check src tests` green; `node --check` on the interface scripts.
-2. `_version.py`, `app/package.json`, README and `CHANGELOG.md` agree.
+1. `python -m pytest -q` and `ruff check python/src python/tests` green; `node --check` on the interface scripts.
+2. `python/src/ozempdf/_version.py`, `electron/package.json`, README and `docs/CHANGELOG.md` agree.
 3. `en.json` key coverage complete and no orphan keys (covered by tests).
 4. Build the engine, then the ZIP; confirm it contains `OzemPDF.exe`, the two launchers and
    `resources/engine/`.
@@ -1545,7 +1545,7 @@ is a test failure, which is deliberate.
   in the catalog. Never a bespoke overlay — native dialogs give focus management and the backdrop for
   free.
 - A new API route: add it to `server.py`, require the session token, validate the method and origin,
-  return JSON, and cover it in `tests/test_web.py`.
+  return JSON, and cover it in `python/tests/test_web.py`.
 
 ### 14.5 Add a preset
 
@@ -1754,58 +1754,59 @@ Line counts are indicative (§1.3). `web/fonts/` holds the OFL texts alongside t
 
 | Path | Lines | Responsibility |
 | --- | --- | --- |
-| `docs/TECHNICAL_SPECIFICATION.md` | 1981 | this specification |
+| `docs/TECHNICAL_SPECIFICATION.md` | 1982 | this specification |
 | `docs/USER_STORIES.md` | 957 | personas, epics, stories, traceability |
 | `docs/DISCREPANCIES.md` | 101 | the D-01…D-21 resolution ledger with evidence |
 | `docs/screenshots/step1.png` … `step3.png`, `inspector.png` | — | README figures, captured from the shipped UI |
-| `src/ozempdf/_version.py` | 3 | version source of truth (`0.3.3`) |
-| `src/ozempdf/__init__.py` | 3 | package facade |
-| `src/ozempdf/__main__.py` | 11 | entry point, `freeze_support` |
-| `src/ozempdf/config.py` | 203 | enums, `CompressionConfig`, presets, clamping |
-| `src/ozempdf/i18n.py` | 195 | JSON catalog manager, `t()` |
-| `src/ozempdf/cli.py` | 259 | argparse, config mapping, run loop, JSON report, exit codes |
-| `src/ozempdf/gui.py` | 20 | `launch_gui`: start the local server and open the browser |
-| `src/ozempdf/server.py` | 933 | loopback HTTP API, static files, `AppState`, run thread, thumbnail pool |
-| `src/ozempdf/settings.py` | 127 | portable/system data locations, whitelisted persistence |
-| `src/ozempdf/logging_setup.py` | 35 | `--verbose` / `OZEMPDF_LOG` |
-| `src/ozempdf/formatting.py` | 27 | byte and percent formatting |
-| `src/ozempdf/resources.py` | 20 | `resource_path` honouring `sys._MEIPASS` |
-| `src/ozempdf/engine/__init__.py` | 77 | engine facade |
-| `src/ozempdf/engine/pipeline.py` | 306 | 7-stage orchestration, save, guardrail, promote |
-| `src/ozempdf/engine/unlock.py` | 545 | read-only open, protection classification, signature flattening |
-| `src/ozempdf/engine/analyzer.py` | 685 | byte audit, CTM/DPI analysis |
-| `src/ozempdf/engine/deduplicator.py` | 637 | SHA-256 resource dedup, opaque `/SMask` removal |
-| `src/ozempdf/engine/image_optimizer.py` | 744 | image modes A/B, classification, JPEG stripping, predictor |
-| `src/ozempdf/engine/font_optimizer.py` | 628 | font subsetting, CMap recompression |
-| `src/ozempdf/engine/stream_optimizer.py` | 240 | bloat stripping, Zopfli streams |
-| `src/ozempdf/engine/signing.py` | 92 | PKCS#12 re-signing, timestamps |
-| `src/ozempdf/engine/batch.py` | 396 | discovery, mapping, collision indexing, rendering, pool |
-| `src/ozempdf/web/index.html` | 477 | interface markup, inline SVG sprite, dialogs |
-| `src/ozempdf/web/styles.css` | 2582 | tokens, layout, components, responsive rules, reduced motion |
-| `src/ozempdf/web/app.js` | 1892 | state, rendering, API calls, inspector, shortcuts |
-| `src/ozempdf/web/fonts/` | — | IBM Plex Sans (latin, latin-ext) and JetBrains Mono `woff2` + OFL texts |
-| `src/ozempdf/locales/en.json` | 322 | English catalog: 19 groups, 282 strings |
-| `app/main.js` | 368 | Electron main: engine spawn, ready handshake, native pickers, close guard, portable data |
-| `app/preload.js` | 23 | the four bridged capabilities, `contextIsolation` |
-| `app/package.json` | 74 | Electron 38 dependency, `electron-builder` zip configuration |
-| `app/launcher/Start OzemPDF (compatibility).cmd` | 6 | `--no-sandbox` host workaround |
-| `app/launcher/Start OzemPDF in browser.cmd` | 12 | browser-only launcher |
-| `app/build/icon.ico`, `icon.png` | — | generated by `scripts/make_icon.py` |
-| `scripts/engine_entry.py` | 4 | frozen engine entry point |
-| `scripts/make_icon.py` | 66 | icon generator (accent tile + document mark) |
-| `build_cross_platform.py` | 135 | PyInstaller driver (one-dir engine) |
-| `tests/conftest.py` | 111 | fixtures and pixel helpers |
-| `tests/pdf_fixtures.py` | 337 | synthetic PDF builders |
-| `tests/test_lossless.py` | 110 | Mode A and guardrail |
-| `tests/test_visually_lossless.py` | 131 | DPI, Mode B, predictor |
-| `tests/test_security_and_fonts.py` | 288 | protection, signatures, fonts |
-| `tests/test_batch.py` | 228 | discovery, mapping, pool, CLI |
-| `tests/test_settings.py` | 113 | persistence, data dir, presets |
-| `tests/test_i18n.py` | 97 | catalogs and key coverage |
-| `tests/test_web.py` | 336 | HTTP API and interface contract |
-| `pyproject.toml` | 55 | packaging, pytest, ruff |
-| `README.md` / `CHANGELOG.md` / `AGENTS.md` | 243 / 165 / 80 | product docs, history, agent rules |
-| `DESIGN.md` / `PRODUCT.md` | 98 / 55 | design contract, product definition |
+| `python/src/ozempdf/_version.py` | 3 | version source of truth (`0.3.3`) |
+| `python/src/ozempdf/__init__.py` | 3 | package facade |
+| `python/src/ozempdf/__main__.py` | 11 | entry point, `freeze_support` |
+| `python/src/ozempdf/config.py` | 203 | enums, `CompressionConfig`, presets, clamping |
+| `python/src/ozempdf/i18n.py` | 195 | JSON catalog manager, `t()` |
+| `python/src/ozempdf/cli.py` | 259 | argparse, config mapping, run loop, JSON report, exit codes |
+| `python/src/ozempdf/gui.py` | 20 | `launch_gui`: start the local server and open the browser |
+| `python/src/ozempdf/server.py` | 933 | loopback HTTP API, static files, `AppState`, run thread, thumbnail pool |
+| `python/src/ozempdf/settings.py` | 127 | portable/system data locations, whitelisted persistence |
+| `python/src/ozempdf/logging_setup.py` | 35 | `--verbose` / `OZEMPDF_LOG` |
+| `python/src/ozempdf/formatting.py` | 27 | byte and percent formatting |
+| `python/src/ozempdf/resources.py` | 20 | `resource_path` honouring `sys._MEIPASS` |
+| `python/src/ozempdf/engine/__init__.py` | 77 | engine facade |
+| `python/src/ozempdf/engine/pipeline.py` | 306 | 7-stage orchestration, save, guardrail, promote |
+| `python/src/ozempdf/engine/unlock.py` | 545 | read-only open, protection classification, signature flattening |
+| `python/src/ozempdf/engine/analyzer.py` | 685 | byte audit, CTM/DPI analysis |
+| `python/src/ozempdf/engine/deduplicator.py` | 637 | SHA-256 resource dedup, opaque `/SMask` removal |
+| `python/src/ozempdf/engine/image_optimizer.py` | 744 | image modes A/B, classification, JPEG stripping, predictor |
+| `python/src/ozempdf/engine/font_optimizer.py` | 628 | font subsetting, CMap recompression |
+| `python/src/ozempdf/engine/stream_optimizer.py` | 240 | bloat stripping, Zopfli streams |
+| `python/src/ozempdf/engine/signing.py` | 92 | PKCS#12 re-signing, timestamps |
+| `python/src/ozempdf/engine/batch.py` | 396 | discovery, mapping, collision indexing, rendering, pool |
+| `python/src/ozempdf/web/index.html` | 477 | interface markup, inline SVG sprite, dialogs |
+| `python/src/ozempdf/web/styles.css` | 2582 | tokens, layout, components, responsive rules, reduced motion |
+| `python/src/ozempdf/web/app.js` | 1892 | state, rendering, API calls, inspector, shortcuts |
+| `python/src/ozempdf/web/fonts/` | — | IBM Plex Sans (latin, latin-ext) and JetBrains Mono `woff2` + OFL texts |
+| `python/src/ozempdf/locales/en.json` | 322 | English catalog: 19 groups, 282 strings |
+| `electron/main.js` | 368 | Electron main: engine spawn, ready handshake, native pickers, close guard, portable data |
+| `electron/preload.js` | 23 | the four bridged capabilities, `contextIsolation` |
+| `electron/package.json` | 74 | Electron 38 dependency, `electron-builder` zip configuration |
+| `electron/launchers/Start OzemPDF (compatibility).cmd` | 6 | `--no-sandbox` host workaround |
+| `electron/launchers/Start OzemPDF in browser.cmd` | 12 | browser-only launcher |
+| `electron/assets/icon.ico`, `icon.png` | — | generated by `python/scripts/make_icon.py` |
+| `python/scripts/engine_entry.py` | 4 | frozen engine entry point |
+| `python/scripts/make_icon.py` | 66 | icon generator (accent tile + document mark) |
+| `python/scripts/build_cross_platform.py` | 135 | PyInstaller driver (one-dir engine) |
+| `python/tests/conftest.py` | 111 | fixtures and pixel helpers |
+| `python/tests/pdf_fixtures.py` | 337 | synthetic PDF builders |
+| `python/tests/test_lossless.py` | 110 | Mode A and guardrail |
+| `python/tests/test_visually_lossless.py` | 131 | DPI, Mode B, predictor |
+| `python/tests/test_security_and_fonts.py` | 288 | protection, signatures, fonts |
+| `python/tests/test_batch.py` | 228 | discovery, mapping, pool, CLI |
+| `python/tests/test_settings.py` | 113 | persistence, data dir, presets |
+| `python/tests/test_i18n.py` | 97 | catalogs and key coverage |
+| `python/tests/test_web.py` | 336 | HTTP API and interface contract |
+| `pyproject.toml` | 56 | packaging, pytest, ruff |
+| `README.md` / `docs/CHANGELOG.md` / `AGENTS.md` | 265 / 178 / 83 | product docs, history, agent rules |
+| `docs/DESIGN.md` / `docs/PRODUCT.md` | 98 / 55 | design contract, product definition |
+| `docs/DEPENDENCIES.md` | 58 | third-party inventory (package manifests are authoritative) |
 | `LICENSE` | — | MIT |
 | `.github/workflows/ci.yml` | — | pytest (three OSes × 3.10/3.14), ruff, `node --check` |
 

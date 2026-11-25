@@ -1,7 +1,7 @@
 """Generate the application icon from the product's mark.
 
-Run: python scripts/make_icon.py
-Outputs app/build/icon.png (512px) and app/build/icon.ico.
+Run: python python/scripts/make_icon.py
+Outputs electron/assets/icon.png (512px) and electron/assets/icon.ico.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ def render(size: int = 512) -> Image.Image:
 
 def main() -> None:
     """Write the PNG and ICO assets next to the Electron build config."""
-    target = Path(__file__).resolve().parents[1] / "app" / "build"
+    target = Path(__file__).resolve().parents[2] / "electron" / "assets"
     target.mkdir(parents=True, exist_ok=True)
     icon = render(512)
     icon.save(target / "icon.png")
