@@ -4,6 +4,15 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.11 — 2026-11-25
+
+### Changed
+
+- **The queue's measured columns are centred.** Pages, Original, Savings and Action now centre both
+  their header and their content in Configure & queue and in Slimmed results (the two tabs share the
+  table), so page counts, sizes, savings chips and row actions line up under their labels instead of
+  hanging off the right edge. The narrow two-line record layout is unchanged.
+
 ## 0.3.10 — 2026-11-25
 
 ### Added

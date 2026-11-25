@@ -943,6 +943,9 @@ Queue table columns (shared header and rows, CSS grid so translations can widen 
 | Savings | `-P%` success pill; `Pending`; `Failed` danger pill; `—` |
 | Action | `Inspect` + `Reset` (done), `Retry` + `Remove` (error), `Remove` (queued), nothing (processing). `Reset` clears the saved result and returns the row to the queue so the file can be slimmed again; it is available in both Configure & queue and Slimmed results because the table is shared |
 
+Pages, Original, Savings and Action centre both their header and their cell content, in Configure &
+queue and in Slimmed results alike.
+
 Below 700 px the table becomes two-line records (document + savings on the first line, pages,
 original and action on the second) so nothing is clipped. Rows are reachable by keyboard, and the
 row button opens the inspector.

@@ -806,12 +806,10 @@ main {
 
 .c-pages {
   width: 66px;
-  text-align: right;
 }
 
 .c-size {
   width: 94px;
-  text-align: right;
 }
 
 .c-status {
@@ -820,11 +818,20 @@ main {
 
 .c-savings {
   width: 92px;
-  text-align: right;
 }
 
 .c-action {
   width: 152px;
+}
+
+/* Pages, Original, Savings and Action read as measured columns: centre both the
+   header and the cell content, in Configure & queue and Slimmed results (they
+   share this table). */
+.queue-table .c-pages,
+.queue-table .c-size,
+.queue-table .c-savings,
+.queue-table .c-action {
+  text-align: center;
 }
 
 .doc {
@@ -1041,7 +1048,7 @@ main {
 
 .row-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 1px;
 }
 
