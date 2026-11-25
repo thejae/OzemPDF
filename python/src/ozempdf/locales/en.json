@@ -58,6 +58,8 @@
     "savings_failed": "Failed",
     "action_inspect": "Inspect",
     "action_retry": "Retry",
+    "action_reset": "Reset",
+    "action_reset_tip": "Clear this result so the file can be slimmed again",
     "action_remove": "Remove",
     "action_copy": "Copy",
     "action_copy_tip": "Copy the complete error message",

@@ -78,7 +78,7 @@ def test_index_serves_ui_and_sets_session_cookie(live) -> None:
     status, body, _headers = client.get("/api/bootstrap")
     assert status == 200
     payload = _json(body)
-    assert payload["version"] == "0.3.7"
+    assert payload["version"] == "0.3.8"
     assert "header.step1" in payload["strings"]
     assert payload["queue"] == []
 
@@ -345,6 +345,48 @@ def test_inspector_renders_protected_pages_after_a_password(live, assets) -> Non
             break
         time.sleep(0.05)
     assert _json(body)["queue"][0]["has_thumb"] is True
+
+
+def test_reset_returns_a_slimmed_row_to_the_queue(live, assets, tmp_path: Path) -> None:
+    """A done row can be reset and slimmed again over the existing output."""
+    _state, base = live
+    client = Client(base)
+    client.get("/")
+    output_dir = tmp_path / "out"
+    client.post(
+        "/api/config",
+        {"config": {"output_mode": "folder", "output_dir": str(output_dir), "preset": "balanced"}},
+    )
+    _status, body, _headers = client.post("/api/queue/add", {"paths": [str(assets.ui)]})
+    item = _json(body)["queue"][0]
+    _status, body, _headers = client.get("/api/bootstrap")
+    config = _json(body)["config"]
+
+    def run_once() -> dict:
+        client.post("/api/run/start", {"ids": [item["id"]], "config": config})
+        for _ in range(150):
+            _status, body, _headers = client.get("/api/run")
+            payload = _json(body)
+            if not payload["running"]:
+                return payload
+            time.sleep(0.2)
+        raise AssertionError("the run never finished")
+
+    first = run_once()
+    assert first["queue"][0]["status"] == "done"
+    assert (output_dir / assets.ui.name).is_file()
+
+    status, body, _headers = client.post("/api/queue/retry", {"id": item["id"]})
+    payload = _json(body)
+    assert status == 200 and payload["ok"] is True
+    reset_row = payload["queue"][0]
+    assert reset_row["status"] == "queued"
+    assert reset_row["result"] is None
+
+    second = run_once()
+    assert second["queue"][0]["status"] == "done"
+    assert second["queue"][0]["result"]["reduction_percent"] > 0
+    assert (output_dir / assets.ui.name).is_file()
 
 
 def test_ui_language_switch(live) -> None:

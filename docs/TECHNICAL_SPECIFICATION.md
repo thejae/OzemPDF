@@ -941,7 +941,7 @@ Queue table columns (shared header and rows, CSS grid so translations can widen 
 | Original | `format_bytes`, or `…` |
 | Status | `Slimmed = <size>` (success); `● New — Queued`; `Slimming…` with an indeterminate bar; `Error: <message>` (danger, full message in `title`); a lock or open-lock badge for protected documents; `Open password required` for a password-locked file |
 | Savings | `-P%` success pill; `Pending`; `Failed` danger pill; `—` |
-| Action | `Inspect` (done), `Retry` + `Remove` (error), `Remove` (queued), nothing (processing) |
+| Action | `Inspect` + `Reset` (done), `Retry` + `Remove` (error), `Remove` (queued), nothing (processing). `Reset` clears the saved result and returns the row to the queue so the file can be slimmed again; it is available in both Configure & queue and Slimmed results because the table is shared |
 
 Below 700 px the table becomes two-line records (document + savings on the first line, pages,
 original and action on the second) so nothing is clipped. Rows are reachable by keyboard, and the

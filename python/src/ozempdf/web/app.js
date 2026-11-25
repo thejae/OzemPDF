@@ -390,6 +390,7 @@
     };
     if (item.status === 'done') {
       add(t('step2.action_inspect'), 'inspect', 'ghost');
+      add(t('step2.action_reset'), 'reset', 'ghost', t('step2.action_reset_tip'));
     } else if (item.status === 'error') {
       add(t('step2.action_copy'), 'copy_error', 'ghost', t('step2.action_copy_tip'));
       add(t('step2.action_retry'), 'retry');
@@ -548,7 +549,9 @@
       label = t('footer.nothing');
     } else {
       const size = formatBytes(pending.reduce((sum, item) => sum + (item.size || 0), 0));
-      const isNew = state.step === 3 || pending.every((item) => item.status === 'new_queued');
+      // "new" is for files added after a run; a reset result is queued again but
+      // is not new, so it must read "Slim 1 PDF", not "Slim 1 new PDF".
+      const isNew = pending.every((item) => item.status === 'new_queued');
       if (pending.length === 1) {
         label = isNew ? t('footer.slim_new_one', { size }) : t('footer.slim_one', { size });
       } else {
@@ -848,10 +851,23 @@
   async function retryItem(id) {
     try {
       const data = await api('/api/queue/retry', { id });
+      if (!data.ok) {
+        showToast(t('errors.run_in_progress'), 'warning');
+        return false;
+      }
       setQueue(data.queue);
+      return true;
     } catch (error) {
       showToast(error.message, 'danger');
+      return false;
     }
+  }
+
+  async function resetItem(id) {
+    // A slimmed row goes back to the queue so the same file can be slimmed
+    // again (step 2 and the results table share this action cell).
+    if (!(await retryItem(id))) return;
+    if (insp.id === id && $('#inspectorDialog').open) closeDialog('inspectorDialog');
   }
 
   /**
@@ -1708,6 +1724,7 @@
         const action = actionNode.dataset.action;
         if (action === 'remove') removeItem(id);
         else if (action === 'retry') retryItem(id);
+        else if (action === 'reset') resetItem(id);
         else if (action === 'copy_error') copyError(id);
         else if (action === 'inspect') openInspector(id);
         return;

@@ -4,6 +4,19 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.8 — 2026-11-25
+
+### Added
+
+- **A slimmed row can be reset and slimmed again.** The Action cell of every completed row now
+  offers `Reset` beside `Inspect`, in both Configure & queue and Slimmed results (the two tabs share
+  the queue table). Reset clears the row's saved result and returns it to `Queued — ready to slim`
+  with the dock reading `Slim 1 PDF`, so the same file can be retried with different settings; the
+  written output stays on disk and the next run replaces it atomically. Reset is refused while a
+  batch is already running, with the running message rather than a silent no-op, and a reset closes
+  the inspector if it is showing that row. Covered by
+  `test_reset_returns_a_slimmed_row_to_the_queue`.
+
 ## 0.3.7 — 2026-11-25
 
 ### Fixed
