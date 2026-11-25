@@ -5,7 +5,7 @@ objects, so nearly every rule here exists to keep a document from being damaged.
 
 ## Before you start
 
-Read [`AGENTS.md`](AGENTS.md). It lists the two invariants every change must preserve:
+Two invariants govern every change:
 
 1. **Never rasterize or rewrite page content.** Page `/Contents` operators, vector paths and text
    are not regenerated.
@@ -46,8 +46,17 @@ UI changes additionally need a look in both themes (light and dark) at desktop a
 with keyboard navigation and reduced motion. The design contract is
 [`docs/DESIGN.md`](docs/DESIGN.md); product truth is [`docs/PRODUCT.md`](docs/PRODUCT.md).
 
-Packaging changes must rebuild `release/OzemPDF-<version>-win.zip` and keep its documented contents;
-the exact checklist is in [`AGENTS.md`](AGENTS.md).
+Packaging changes must rebuild the portable Windows ZIP and keep its documented contents:
+
+```bash
+python python/scripts/build_cross_platform.py   # frozen engine -> artifacts/dist/engine/
+cd electron && npm run dist                     # ZIP -> release/OzemPDF-<version>-win.zip
+```
+
+The ZIP must contain `OzemPDF.exe`, `Start OzemPDF (compatibility).cmd`,
+`Start OzemPDF in browser.cmd` and `resources/engine/`. Verify that the browser launcher serves the
+UI (`--serve --no-browser --port <port>`, then request `/` and `/api/bootstrap`) and that the desktop
+app opens from a normal writable extraction folder outside the checkout.
 
 ## Changelog and versioning
 

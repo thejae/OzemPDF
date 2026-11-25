@@ -28,7 +28,7 @@ path in this repository.
 | **D-16** | `/Thumb` images were counted as images even though the role is metadata | The analyzer classifies by role first, so a page `/Thumb` counts as metadata even when it is an image stream. |
 | **D-17** | `/ToUnicode` savings were credited without a counter | Separate `cmaps_optimized` counter in `FileCompressionResult` and the JSON schema. |
 | **D-18** | Colliding output paths silently overwrote one another | `_unique_outputs` appends `-2`, `-3` before the extension; a test covers two same-named inputs targeting one output folder. |
-| **D-19** | No CI, no lint config, no license, no contributing notes | `.github/workflows/ci.yml` (Windows/macOS/Linux, Python 3.10/3.14, ruff, `node --check`), ruff config in `pyproject.toml`, MIT `LICENSE`, `AGENTS.md` with invariants and the completion checklist. |
+| **D-19** | No CI, no lint config, no license, no contributing notes | `.github/workflows/ci.yml` (Windows/macOS/Linux, Python 3.10/3.14, ruff, `node --check`), ruff config in `pyproject.toml`, MIT `LICENSE`, `CONTRIBUTING.md` with the invariants and the completion checklist. |
 | **D-20** | `pdf` parameter threaded through image helpers unused | Helpers take only the stream they mutate; the pipeline-facing entry points take what they use. |
 | **D-21** | Language was written but never restored | `language` is in `PERSISTED_KEYS` and restored by `AppState` at launch, before the first page is served. Tests cover the round-trip and the `/api/ui` switch. |
 
@@ -36,7 +36,7 @@ path in this repository.
 
 | ID | Symptom | Fix |
 | --- | --- | --- |
-| **N-01** | Compressed pages rendered blank | `/ColorSpace` was written as a PDF *string* because a plain `str` was passed to pikepdf. Now `pikepdf.Name(colorspace)`, and `/Indexed` spaces are built as `pikepdf.Array([Name("/Indexed"), …])`. Invariant recorded in `AGENTS.md` and spec §4.6. |
+| **N-01** | Compressed pages rendered blank | `/ColorSpace` was written as a PDF *string* because a plain `str` was passed to pikepdf. Now `pikepdf.Name(colorspace)`, and `/Indexed` spaces are built as `pikepdf.Array([Name("/Indexed"), …])`. Invariant recorded in `CONTRIBUTING.md` and spec §4.6. |
 | **N-02** | Strict Lossless shifted gradient colours | The palette path quantised unconditionally (mean pixel difference 28.6). `_exact_palette_candidate` now only quantises when the image has ≤ 256 unique colours, so gradients stay photographic. Covered by `test_lossless` pixel comparison. |
 | **N-03** | `[Errno 13] Permission denied` on OneDrive/cloud placeholders and read-only media | Inputs were opened with `allow_overwriting_input=True` although the pipeline never writes to the source. Removed; `test_input_is_opened_read_only` asserts it stays removed, and a `PermissionError` now produces an actionable message naming the path (`test_permission_denied_is_actionable`). |
 | **N-04** | Header showed `v0.3.0` on a 0.3.3 build | Version chip rendered from `state.version`; static fallback asserted by a test (see D-09). |

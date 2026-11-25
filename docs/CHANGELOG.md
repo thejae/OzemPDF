@@ -22,10 +22,14 @@ All notable changes to OzemPDF are documented here. The format follows
 - **The README can no longer drift from the released version.** The hardcoded `v0.3.3` header and
   the `release/OzemPDF-0.3.5-win.zip` path are gone: the version is a release badge and the portable
   ZIP is described as published on the Releases page.
-- **`AGENTS.md` no longer names a machine-local key path.** The signing rule now says to use the
-  locally configured key and never commit a key, a passphrase or a path outside the repository.
-- **Repository hygiene.** `.gitattributes` normalises text and marks binaries, `.gitignore` covers
-  the runtime `data/` folder, and `.editorconfig` records the existing indentation and line endings.
+- **Repository hygiene.** `.gitattributes` normalises text and marks binaries, `.gitignore` ignores
+  the runtime `data/` folder and local agent instructions, and `.editorconfig` records the existing
+  indentation and line endings.
+
+### Removed
+
+- **`AGENTS.md` is no longer published.** The agent rules stay on developer machines and are ignored
+  by Git; the invariant contract, gates and commit convention now live in `CONTRIBUTING.md`.
 
 ### Fixed
 

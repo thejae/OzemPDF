@@ -27,6 +27,9 @@ shots/
 # Tooling metadata
 .codegraph/
 
+# Local agent instructions (kept out of the published repository)
+AGENTS.md
+
 # OS / editors
 Thumbs.db
 .DS_Store

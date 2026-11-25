@@ -945,7 +945,7 @@ US-039, US-041), `python/tests/test_settings.py` (US-036, US-057), `python/tests
 **Ready** — the story has personas, measurable acceptance criteria, a priority, and an
 owner-visible scope.
 
-**Done** — additionally, per this repo's `AGENTS.md`:
+**Done** — additionally, per this repo's `CONTRIBUTING.md`:
 - No user-facing string is hardcoded; every new key exists in `python/src/ozempdf/locales/en.json` and no
   orphan key remains (tested).
 - Both themes are verified at desktop and mobile widths for any touched surface, and the layout

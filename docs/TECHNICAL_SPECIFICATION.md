@@ -9,7 +9,7 @@
 | Document status | Current-state specification (descriptive + normative for invariants) |
 | Last updated | 2026-11-24 |
 | Audience | Maintainers, integrators, reviewers, AI coding agents |
-| Related documents | [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), [`CHANGELOG.md`](CHANGELOG.md), [`DESIGN.md`](DESIGN.md), [`PRODUCT.md`](PRODUCT.md), [`DISCREPANCIES.md`](DISCREPANCIES.md), [`DEPENDENCIES.md`](DEPENDENCIES.md), [`pyproject.toml`](../pyproject.toml) |
+| Related documents | [`README.md`](../README.md), [`CHANGELOG.md`](CHANGELOG.md), [`DESIGN.md`](DESIGN.md), [`PRODUCT.md`](PRODUCT.md), [`DISCREPANCIES.md`](DISCREPANCIES.md), [`DEPENDENCIES.md`](DEPENDENCIES.md), [`pyproject.toml`](../pyproject.toml) |
 
 > **Architecture history.** Versions up to 0.2.0 shipped a PySide6 desktop GUI. From 0.3.0 the
 > presentation layer is plain HTML/CSS/JavaScript served by the Python engine over a loopback HTTP
@@ -22,7 +22,7 @@
 > Where prose in the README or a locale catalog disagrees with observable behaviour, the behaviour of
 > `python/src/ozempdf/**` is authoritative and the disagreement is recorded in
 > [§16](#16-defect-ledger-and-known-limitations). Normative project rules live in
-> [`AGENTS.md`](../AGENTS.md); this specification restates them and adds precision, it does not relax
+> [`CONTRIBUTING.md`](../CONTRIBUTING.md); this specification restates them and adds precision, it does not relax
 > them.
 
 ---
@@ -154,8 +154,8 @@ These are normative and are enforced by review, tests, or code structure.
 | `INV-2` | An individual image stream is replaced only if the replacement payload is strictly smaller. | `if len(new) < orig_len` at every `_apply_stream_update` call site. |
 | `INV-3` | The final output PDF is never larger than the input. | Post-save size check in `pipeline.py`; the original is copied instead. |
 | `INV-4` | Cross-platform: no OS-specific paths, shell-outs or native-code paths outside the two documented modules. | `pathlib`, `sys._MEIPASS` handling in `resources.py`; `os.name` branches only in `settings.py` (data locations) and `server.py` (`_open_in_os`). |
-| `INV-5` | All user-facing strings go through `ozempdf.i18n.t` in Python and `data-i18n`/`t()` in the UI. | `AGENTS.md`; tests assert key coverage and zero orphans. |
-| `INV-6` | Every module, class and public function carries type annotations and a Google-style docstring. | `AGENTS.md`. |
+| `INV-5` | All user-facing strings go through `ozempdf.i18n.t` in Python and `data-i18n`/`t()` in the UI. | This document; tests assert key coverage and zero orphans. |
+| `INV-6` | Every module, class and public function carries type annotations and a Google-style docstring. | This document. |
 | `INV-7` | Inputs are opened **read-only**; every output write is atomic (temp file in the destination directory, then `os.replace`). | `unlock._open_pdf` has no `allow_overwriting_input`; a test asserts it; the pipeline never writes to the source path. |
 
 ### 2.5 Layered architecture
@@ -1521,7 +1521,7 @@ flags, and confirming that only `data/` appears next to it and `%APPDATA%\OzemPD
   name and the interface's version chip (rendered from the API, not hardcoded).
 - `docs/CHANGELOG.md` follows Keep a Changelog with `Added` / `Changed` / `Fixed` / `Removed` per version.
 - **CON-1** Every behaviour change MUST update the changelog and, when the release changes, the
-  version (`AGENTS.md`).
+  version (`CONTRIBUTING.md`).
 - **CON-2** Commits MUST be atomic, conventional, and GPG-signed.
 
 ### 13.6 Release checklist
@@ -1717,7 +1717,7 @@ the evidence (test or code path) for each. This table is the short form.
 | `D-16` | `/Thumb` images counted as images although the role is metadata | Classified by role first: a page `/Thumb` counts as metadata even when it is an image stream |
 | `D-17` | `/ToUnicode` savings credited without a counter | Separate `cmaps_optimized` counter, `fonts_subsetted` alias preserved |
 | `D-18` | Colliding output paths silently overwrote one another | Collisions get `-2`, `-3` before the extension; tested |
-| `D-19` | No CI, no lint config, no license | `.github/workflows/ci.yml` (three OSes, 3.10/3.14), ruff config, MIT `LICENSE`, `AGENTS.md` |
+| `D-19` | No CI, no lint config, no license | `.github/workflows/ci.yml` (three OSes, 3.10/3.14), ruff config, MIT `LICENSE`, `CONTRIBUTING.md` |
 | `D-20` | Unused `pdf` parameter threaded through image helpers | Helpers take only the stream they mutate |
 | `D-21` | Language written but never restored | Stored and restored by `AppState` at launch; round-trip test |
 
@@ -1834,7 +1834,7 @@ Line counts are indicative (§1.3). `web/fonts/` holds the OFL texts alongside t
 | `python/tests/test_i18n.py` | 97 | catalogs and key coverage |
 | `python/tests/test_web.py` | 336 | HTTP API and interface contract |
 | `pyproject.toml` | 56 | packaging, pytest, ruff |
-| `README.md` / `docs/CHANGELOG.md` / `AGENTS.md` | 265 / 178 / 83 | product docs, history, agent rules |
+| `README.md` / `docs/CHANGELOG.md` | 265 / 178 | product docs, history |
 | `docs/DESIGN.md` / `docs/PRODUCT.md` | 98 / 55 | design contract, product definition |
 | `docs/DEPENDENCIES.md` | 58 | third-party inventory (package manifests are authoritative) |
 | `LICENSE` | — | MIT |
