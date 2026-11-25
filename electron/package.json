@@ -23,7 +23,7 @@
     "dist": "electron-builder --win zip"
   },
   "devDependencies": {
-    "electron": "^38.0.0",
+    "electron": "^38.8.6",
     "electron-builder": "^26.0.12"
   },
   "build": {
