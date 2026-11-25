@@ -1020,7 +1020,9 @@ the dialog except over a text field), and the keys
 `scale = clamp(1.15 * (zoom/200), 0.5, 3400/longest_side)` so a huge page cannot stall the dialog.
 The footer holds the wipe slider (2–98), the percentage readout, a pan hint, `Open file` and `Done`.
 A page the engine cannot rasterise shows a localized notice over the canvas instead of leaving a
-silent dark stage; the file on disk is untouched.
+silent dark stage; the file on disk is untouched. Multi-page documents also carry a floating pair of
+round previous/next buttons at the bottom right of the canvas (the header page control remains);
+they disable at the first and last page and are hidden entirely for single-page documents.
 
 ### 7.11 Drag and drop
 
@@ -1028,6 +1030,10 @@ The drop mat, the queue panel and the window are all drop targets; dragging over
 up the shared `dragActive` state. In the desktop shell the dropped path comes from Electron's
 `webUtils.getPathForFile`; in a browser, where a real path cannot be revealed, the file is staged
 through `/api/upload` and compressed from that copy, so the browser build never silently loses files.
+Only real files (a `Files` payload) or plain path text are accepted: element and link drags that
+carry an image url are ignored, so dragging the inspector's page or a queue thumbnail cannot be
+mistaken for queued input. Queue thumbnails are not draggable, no drag can start inside the inspector
+dialog, and all drops are ignored while that modal is open.
 
 ### 7.12 Keyboard shortcuts
 

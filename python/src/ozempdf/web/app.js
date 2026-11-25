@@ -415,6 +415,7 @@
       img.src = `/api/thumb?id=${encodeURIComponent(item.id)}&v=${item.thumb_version}`;
       img.alt = '';
       img.loading = 'lazy';
+      img.draggable = false;
       thumb.appendChild(img);
     } else {
       thumb.appendChild(icon('file', 'thumb-placeholder'));
@@ -1357,6 +1358,13 @@
       t('inspector.page_of', { page: insp.page, total: insp.total })
     );
     $('#pageTotal').textContent = `/ ${insp.total}`;
+    // Floating pager: only useful (and only shown) when there is somewhere to go.
+    const fabGroup = $('.page-fab');
+    if (fabGroup) fabGroup.hidden = insp.total <= 1;
+    const fabPrev = $('#fabPrev');
+    const fabNext = $('#fabNext');
+    if (fabPrev) fabPrev.disabled = insp.page <= 1;
+    if (fabNext) fabNext.disabled = insp.page >= insp.total;
     $$('#zoomPills [data-zoom]').forEach((button) => {
       const active = Number(button.dataset.zoom) === insp.zoom;
       button.classList.toggle('active', active);
@@ -1495,7 +1503,19 @@
 
   function bindInspector() {
     const canvas = $('#wipeCanvas');
+    const dialog = $('#inspectorDialog');
+    // A drag that starts inside the modal (page image, corner badge, page number)
+    // must never become a drop on the queue behind it: a dropped image url used
+    // to be read as a list of paths.
+    dialog.addEventListener('dragstart', (event) => event.preventDefault());
+    dialog.addEventListener('drop', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
     canvas.addEventListener('pointerdown', (event) => {
+      // The floating pager lives on the canvas; its buttons must keep their
+      // clicks (pointer capture would retarget them to the canvas).
+      if (event.target.closest('button, a, input, [role="button"]')) return;
       const rect = canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const wipeX = (rect.width * insp.wipe) / 100;
@@ -1555,6 +1575,8 @@
     $('#pagePrev').addEventListener('click', () => setInspectorPage(insp.page - 1));
     $('#pageNext').addEventListener('click', () => setInspectorPage(insp.page + 1));
     $('#pageInput').addEventListener('change', (event) => setInspectorPage(Number(event.target.value) || 1));
+    $('#fabPrev').addEventListener('click', () => setInspectorPage(insp.page - 1));
+    $('#fabNext').addEventListener('click', () => setInspectorPage(insp.page + 1));
     // Delegated so the pills keep working even if the header is rebuilt.
     $('#zoomPills').addEventListener('click', (event) => {
       const pill = event.target.closest('[data-zoom]');
@@ -1631,13 +1653,21 @@
     const zones = [$('#dropMat'), $('#queuePanel')];
     let depth = 0;
     const light = (on) => zones.forEach((zone) => zone && zone.classList.toggle('drag-active', on));
+    // The inspector is modal: a drag that happens while it is open is a page
+    // element or selected text, never a file for the queue.
+    const inspectorOpen = () => {
+      const dialog = $('#inspectorDialog');
+      return Boolean(dialog && dialog.open);
+    };
     window.addEventListener('dragenter', (event) => {
       event.preventDefault();
+      if (inspectorOpen()) return;
       depth += 1;
       light(true);
     });
     window.addEventListener('dragover', (event) => {
       event.preventDefault();
+      if (inspectorOpen()) return;
       if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
     });
     window.addEventListener('dragleave', () => {
@@ -1648,11 +1678,22 @@
       event.preventDefault();
       depth = 0;
       light(false);
+      if (inspectorOpen()) return;
+      const types = Array.from((event.dataTransfer && event.dataTransfer.types) || []);
+      // Element and link drags (an image carries its own url) must never be read
+      // as dropped paths.
+      if (!types.includes('Files') && (types.includes('text/uri-list') || types.includes('text/html'))) {
+        return;
+      }
       const files = Array.from(event.dataTransfer.files || []);
       if (!files.length) {
         const text = event.dataTransfer.getData('text/plain');
         if (text) {
-          const paths = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+          const paths = text
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .filter((line) => !/^[a-z][a-z0-9+.-]*:\/\//i.test(line));
           if (paths.length) await addPaths(paths);
         }
         return;

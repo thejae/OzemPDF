@@ -4,6 +4,23 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.10 — 2026-11-25
+
+### Added
+
+- **Floating previous/next arrows in the inspector.** Multi-page documents get a pair of round page
+  buttons at the bottom right of the canvas, so paging does not require reaching back to the header
+  while zoomed in. They disable on the first and last page, hide for single-page documents, keep
+  working inside the canvas, and carry localized labels and titles.
+
+### Fixed
+
+- **Dragging inside the inspector no longer looks like a drop onto the queue.** A drag that starts in
+  the modal (the page image, a corner badge, the page number) is cancelled at the source and every
+  drop is ignored while the inspector is open, so the queue can no longer light up or accept a
+  dropped preview. Element and link drags carrying an image url are no longer read as path lists
+  (only real files or plain path text are), and queue thumbnails are no longer draggable.
+
 ## 0.3.9 — 2026-11-25
 
 ### Added
