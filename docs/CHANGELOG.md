@@ -16,6 +16,14 @@ All notable changes to OzemPDF are documented here. The format follows
   handles on files they are syncing or inspecting; and a denial that persists is now reported against
   the destination folder with the OS reason, suggesting a sync check or another output folder. A
   denial while reading the input keeps the original download-the-cloud-copy advice.
+- **Running the app from inside the development checkout is now documented as unsupported.** The
+  OneDrive write failure reported against 0.3.5 was the checkout's sandbox, not OneDrive: the same
+  packaged engine, extracted outside the checkout, compressed that file into that folder
+  (5 407 573 → 1 014 067 bytes), while a scheduled-task launch of the in-checkout copy could write
+  only inside the checkout and `python.exe` — installed outside it — could write anywhere. Sandboxing
+  follows the executable's location, so it presented as a OneDrive permission problem. `README.md`
+  now says to extract the ZIP outside the checkout, and `docs/DISCREPANCIES.md` records the evidence
+  as N-11.
 
 ## 0.3.4 — 2026-11-25
 

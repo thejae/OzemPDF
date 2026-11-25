@@ -103,13 +103,18 @@ there as expected.
 
 ### Windows: portable, no installer
 
-The Windows build is a single **portable ZIP**: `release/OzemPDF-0.3.3-win.zip`. There is no
+The Windows build is a single **portable ZIP**: `release/OzemPDF-0.3.5-win.zip`. There is no
 installer, no registry entry, no Program Files copy and no uninstaller. Extract it anywhere
 writable (for example `D:\OzemPDF`) and run from there; do not run it from inside the ZIP.
 
 1. `OzemPDF.exe` — the desktop app. On a normal PC, extract the ZIP to a writable folder (Desktop,
    `D:\OzemPDF`, a USB stick) and double-click this file; no command line or shortcut flags needed.
-   Do not run it from inside the ZIP, from Program Files, or from a protected/build folder.
+   Do not run it from inside the ZIP, from Program Files, or from a protected/build folder — and not
+   from `release/win-unpacked` inside this repository. A development checkout can be sandboxed (by an
+   agent or a developer sandbox), and a sandboxed app inherits that folder boundary: it can read any
+   PDF but is refused writes outside the checkout, which surfaces as `Could not write the result into
+   …` when the output goes to OneDrive, the Desktop or any other normal folder. The same build run
+   from an extracted folder outside the checkout writes those outputs normally.
 2. `Start OzemPDF (compatibility).cmd` — the same desktop app with Chromium's sandbox disabled, for
    the rare host that still blocks the Electron sandbox.
 3. `Start OzemPDF in browser.cmd` — launches the bundled Python engine and opens the complete
