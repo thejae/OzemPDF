@@ -14,6 +14,11 @@ All notable changes to OzemPDF are documented here. The format follows
 - **The ledger states its own status.** A banner and an at-a-glance table say that all 36 defects
   are closed and that only the Deferred section is open, so the page reads as history rather than a
   backlog.
+- **Documentation and screenshots match 0.3.15.** The specification now names 0.3.15 as the described
+  version (0.3.3 remains the descriptive baseline), its CLI, ZIP and bootstrap examples show the
+  current version, Appendix A/C line and string counts and the test inventory were refreshed, and the
+  pipeline docstring says seven stages. The four README screenshots were regenerated from the shipped
+  0.3.15 UI with the same fixtures and numbers.
 
 ### Fixed
 

@@ -1,4 +1,4 @@
-"""Six-stage compression orchestration for a single PDF.
+"""Seven-stage compression orchestration for a single PDF.
 
 The pipeline is the only place that writes output files. Every stage mutates an
 open document in place; the save is atomic (temp file in the destination

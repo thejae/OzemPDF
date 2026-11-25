@@ -269,8 +269,8 @@ source of truth; [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) is the human-rea
 
 The documentation lives in [`docs/`](docs/):
 
-- [`TECHNICAL_SPECIFICATION.md`](docs/TECHNICAL_SPECIFICATION.md) — the current-state specification of
-  the engine, CLI, API and interface
+- [`TECHNICAL_SPECIFICATION.md`](docs/TECHNICAL_SPECIFICATION.md) — the engine, CLI, API and interface
+  specification (descriptive baseline 0.3.3; later changes are in the changelog)
 - [`USER_STORIES.md`](docs/USER_STORIES.md) — personas, epics, acceptance criteria and traceability
 - [`DISCREPANCIES.md`](docs/DISCREPANCIES.md) — every defect from the previous PySide6 architecture,
   how it was resolved, and what the rebuild introduced
