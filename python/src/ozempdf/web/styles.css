@@ -962,6 +962,9 @@ main {
 
 .status-error .status-text {
   color: var(--danger);
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .status-extra {

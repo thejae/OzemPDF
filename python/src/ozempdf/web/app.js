@@ -377,16 +377,21 @@
   function actionCell(item) {
     const cell = el('td', 'c-action');
     const wrap = el('div', 'row-actions');
-    const add = (label, action, variant = 'ghost') => {
+    const add = (label, action, variant = 'ghost', tip = '') => {
       const button = el('button', `btn ${variant} xs`, label);
       button.type = 'button';
       button.dataset.action = action;
       button.dataset.id = item.id;
+      if (tip) {
+        button.title = tip;
+        button.setAttribute('aria-label', tip);
+      }
       wrap.appendChild(button);
     };
     if (item.status === 'done') {
       add(t('step2.action_inspect'), 'inspect', 'ghost');
     } else if (item.status === 'error') {
+      add(t('step2.action_copy'), 'copy_error', 'ghost', t('step2.action_copy_tip'));
       add(t('step2.action_retry'), 'retry');
       add(t('step2.action_remove'), 'remove');
     } else if (item.status !== 'processing') {
@@ -846,6 +851,47 @@
       setQueue(data.queue);
     } catch (error) {
       showToast(error.message, 'danger');
+    }
+  }
+
+  /**
+   * Put the complete failure text on the clipboard.
+   *
+   * The status column is width-capped, so a long message is ellipsized and a
+   * drag-selection can only reach the visible part. Copying from the queue row
+   * uses the stored message, so the whole diagnostic arrives even when the
+   * column shows the beginning only.
+   */
+  async function copyError(id) {
+    const item = state.queue.find((entry) => entry.id === id);
+    const message = item && item.error ? item.error : '';
+    if (!message) return;
+    try {
+      await navigator.clipboard.writeText(message);
+      showToast(t('notices.copied'), 'success');
+      return;
+    } catch (error) {
+      /* Clipboard API can be unavailable; fall through to the legacy path. */
+    }
+    const area = el('textarea');
+    area.value = message;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    let copied = false;
+    try {
+      copied = document.execCommand('copy');
+    } catch (error) {
+      copied = false;
+    }
+    area.remove();
+    if (copied) {
+      showToast(t('notices.copied'), 'success');
+    } else {
+      showToast(t('notices.copy_failed'), 'danger');
     }
   }
 
@@ -1642,6 +1688,7 @@
         const action = actionNode.dataset.action;
         if (action === 'remove') removeItem(id);
         else if (action === 'retry') retryItem(id);
+        else if (action === 'copy_error') copyError(id);
         else if (action === 'inspect') openInspector(id);
         return;
       }

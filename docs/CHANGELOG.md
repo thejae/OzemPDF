@@ -4,7 +4,13 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.3.4 — 2026-11-25
+
+### Added
+
+- **Failed rows can hand over the complete error message.** A failed file in the queue now carries a
+  `Copy` action that puts the whole diagnostic on the clipboard, not the ellipsized beginning the
+  status column can show. The message stays selectable in place, and the column keeps its width.
 
 ### Changed
 
@@ -16,6 +22,16 @@ All notable changes to OzemPDF are documented here. The format follows
   only the source groups, generated outputs and conventional project files. Command paths and the
   build script follow the move; the shipped engine and ZIP contents are unchanged. Third-party
   manifests are indexed in `docs/DEPENDENCIES.md`.
+
+### Fixed
+
+- **Multi-file slimming failed in the shipped engine.** The frozen sidecar is built with PyInstaller,
+  and it never called `multiprocessing.freeze_support()`: Windows starts pool workers by re-running
+  the executable with a `--multiprocessing-fork` payload, argparse consumed that flag, and every run
+  with two or more files failed with `unrecognized arguments: --multiprocessing-fork` while
+  single-file runs kept working. The entry point now consumes the spawn payload before the parser,
+  and a guard test keeps the call ahead of `run_cli()`. Unpacked source runs were never affected,
+  which is why the suite stayed green.
 
 ## 0.3.3 — 2026-11-24
 

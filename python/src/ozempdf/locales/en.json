@@ -59,6 +59,8 @@
     "action_inspect": "Inspect",
     "action_retry": "Retry",
     "action_remove": "Remove",
+    "action_copy": "Copy",
+    "action_copy_tip": "Copy the complete error message",
     "thumb_tip": "Preview {name}",
     "row_tip": "Select to inspect this file's breakdown"
   },
@@ -257,6 +259,8 @@
     "run_finished": "Slimming complete",
     "run_stopped": "Stopped — finished files were kept",
     "run_failed": "Slimming failed",
+    "copied": "Copied to clipboard",
+    "copy_failed": "Could not copy the message",
     "optimal": "Already as small as it gets — the original was kept."
   },
   "errors": {
