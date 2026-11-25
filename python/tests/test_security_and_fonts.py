@@ -326,7 +326,7 @@ def test_sign_after_slimming(assets, tmp_path: Path) -> None:
         assert signature is not None
         assert signature.get("/ByteRange") is not None
         # /Contents is a PDF string holding the CMS container, not a stream.
-        assert len(signature.get("/Contents").as_bytes()) > 100
+        assert len(bytes(signature.get("/Contents"))) > 100
         assert pdf.is_encrypted is False
 
 

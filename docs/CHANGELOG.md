@@ -28,6 +28,9 @@ All notable changes to OzemPDF are documented here. The format follows
   numpy, but it was never declared, so a fresh `pip install -e ".[dev]"` produced a suite that died
   at `conftest` import — every GitHub Actions pytest job failed while local runs (with numpy already
   present) passed. numpy is now in the `dev` extra.
+- **The signing assertion uses a portable pikepdf API.** Python 3.10 resolves pikepdf 10.13 (10.18
+  requires 3.11), which has no `Object.as_bytes()`; the test now reads the CMS container with
+  `bytes(...)`, which both versions support. This was the remaining 3.10-only CI failure.
 - **A failed file no longer reports 100 % savings.** `FileCompressionResult.bytes_saved` ignored
   `success`, so a document that could not be opened (empty, truncated beyond recovery, wrong
   password) was serialised with `compressed_bytes: 0`, `bytes_saved` equal to its whole size and
