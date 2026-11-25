@@ -6,6 +6,11 @@ All notable changes to OzemPDF are documented here. The format follows
 
 ## 0.3.15 — 2026-11-25
 
+### Changed
+
+- **The discrepancy ledger is current again.** It records N-14 and N-15, and retires the frozen
+  0.3.3-era string counts, version claim and developer-path fragment.
+
 ### Fixed
 
 - **A failed file no longer reports 100 % savings.** `FileCompressionResult.bytes_saved` ignored
