@@ -82,6 +82,39 @@ def _flate_stream(pdf: pikepdf.Pdf, image: Image.Image) -> pikepdf.Object:
     return pdf.make_indirect(stream)
 
 
+def _bilevel_stream(pdf: pikepdf.Pdf, image: Image.Image) -> pikepdf.Object:
+    """Embed a 1-bit image as FlateDecode *stored* data, the way Word does it.
+
+    Level 0 keeps the source stream large so the compressor's zopfli candidate
+    always wins, which is what exercises the 1-bit recompression path.
+    """
+    if image.mode != "1":
+        image = image.convert("1")
+    stream = pikepdf.Stream(pdf, zlib.compress(image.tobytes(), 0))
+    stream.stream_dict.update(
+        {
+            "/Type": pikepdf.Name("/XObject"),
+            "/Subtype": pikepdf.Name("/Image"),
+            "/Width": image.width,
+            "/Height": image.height,
+            "/ColorSpace": pikepdf.Name("/DeviceGray"),
+            "/BitsPerComponent": 1,
+            "/Filter": pikepdf.Name("/FlateDecode"),
+        }
+    )
+    return pdf.make_indirect(stream)
+
+
+def bilevel_mask(width: int = 1188, height: int = 197) -> Image.Image:
+    """Dense 1-bit text-run mask: glyph-like blocks on a transparent ground."""
+    image = Image.new("1", (width, height), 0)
+    draw = ImageDraw.Draw(image)
+    for index in range(6):
+        left = 24 + index * 190
+        draw.rectangle([left, 40, left + 150, 160], fill=1)
+    return image
+
+
 def _page_with_images(
     pdf: pikepdf.Pdf,
     placements: list[tuple[pikepdf.Object, tuple[float, float, float, float]]],
@@ -141,6 +174,54 @@ def build_tiny_pdf(path: Path) -> Path:
     pdf = pikepdf.new()
     page = pdf.add_blank_page(page_size=(200, 200))
     page.Contents = pdf.make_stream(b"q 0 0 1 rg 0 0 10 10 re f Q")
+    pdf.save(path)
+    pdf.close()
+    return path
+
+
+def build_bilevel_pdf(path: Path) -> Path:
+    """A page drawn entirely through a 1-bit DeviceGray mask."""
+    pdf = pikepdf.new()
+    image = _bilevel_stream(pdf, bilevel_mask())
+    _page_with_images(pdf, [(image, (594, 98.5, 72, 400))])
+    pdf.save(path)
+    pdf.close()
+    return path
+
+
+def build_bilevel_inverted_pdf(path: Path) -> Path:
+    """A 1-bit mask whose ``/Decode`` array inverts it; bytes must stay put."""
+    pdf = pikepdf.new()
+    image = _bilevel_stream(pdf, bilevel_mask())
+    image.stream_dict["/Decode"] = pikepdf.Array([1, 0])
+    _page_with_images(pdf, [(image, (594, 98.5, 72, 400))])
+    pdf.save(path)
+    pdf.close()
+    return path
+
+
+def build_text_mask_pdf(path: Path) -> Path:
+    """The construct Word emits for a text run: a 2x2 indexed image + 1-bit /SMask."""
+    pdf = pikepdf.new()
+    palette = bytes((26, 26, 26, 26, 26, 26))
+    base = pdf.make_indirect(
+        pikepdf.Stream(pdf, zlib.compress(b"\x00\x00", 0))
+    )
+    base.stream_dict.update(
+        {
+            "/Type": pikepdf.Name("/XObject"),
+            "/Subtype": pikepdf.Name("/Image"),
+            "/Width": 2,
+            "/Height": 2,
+            "/ColorSpace": pikepdf.Array(
+                [pikepdf.Name("/Indexed"), pikepdf.Name("/DeviceRGB"), 1, pikepdf.String(palette)]
+            ),
+            "/BitsPerComponent": 1,
+            "/Filter": pikepdf.Name("/FlateDecode"),
+        }
+    )
+    base.stream_dict["/SMask"] = _bilevel_stream(pdf, bilevel_mask())
+    _page_with_images(pdf, [(base, (142.59, 23.64, 43.2, 600))])
     pdf.save(path)
     pdf.close()
     return path

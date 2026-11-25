@@ -161,15 +161,8 @@ def _optimize_lossless(
     if width <= 0 or height <= 0:
         return
 
-    if bpc == 1:
-        payload = zopfli_compress(original_raw, 15)
-        if len(payload) < len(original_raw):
-            _apply_stream_update(
-                image, payload, filter_="/FlateDecode", colorspace="/DeviceGray",
-                width=width, height=height, bpc=1,
-            )
-            stats.bytes_saved += len(original_raw) - len(payload)
-            stats.images_optimized += 1
+    if bpc == 1 and _is_device_gray(image):
+        _recompress_bilevel(image, original_raw, stats, 15)
         return
 
     try:
@@ -265,15 +258,8 @@ def _optimize_perceptual(
     if width <= 0 or height <= 0:
         return
 
-    if bpc == 1:
-        payload = zopfli_compress(original_raw, config.zopfli_iterations)
-        if len(payload) < len(original_raw):
-            _apply_stream_update(
-                image, payload, filter_="/FlateDecode", colorspace="/DeviceGray",
-                width=width, height=height, bpc=1,
-            )
-            stats.bytes_saved += len(original_raw) - len(payload)
-            stats.images_optimized += 1
+    if bpc == 1 and _is_device_gray(image):
+        _recompress_bilevel(image, original_raw, stats, config.zopfli_iterations)
         return
 
     try:
@@ -488,6 +474,60 @@ def _exact_palette_candidate(pil: Image.Image, max_colors: int = 256) -> tuple[b
 # --------------------------------------------------------------------------- #
 # Shared helpers
 # --------------------------------------------------------------------------- #
+
+
+def _is_device_gray(image: pikepdf.Object) -> bool:
+    """True when a 1-bit raster is plain grayscale rather than indexed/colour."""
+    try:
+        return str(image.get("/ColorSpace", "")) == "/DeviceGray"
+    except Exception:
+        return False
+
+
+def _recompress_bilevel(
+    image: pikepdf.Object,
+    original_raw: bytes,
+    stats: ImageOptimizationStats,
+    iterations: int,
+) -> None:
+    """Recompress a 1-bit grayscale raster without changing a single pixel.
+
+    ``original_raw`` is the *encoded* stream.  Feeding it back to the compressor
+    and storing the result with ``/FlateDecode`` produced a stream that decoded
+    to a deflate blob instead of a raster: every 1-bit mask then rendered as a
+    noise strip.  Word draws some text runs as a tiny colour image masked by a
+    1-bit bitmap, so that single mistake erased whole lines of text.  The raster
+    must be decoded first.
+
+    ``/Decode`` (an inversion) changes what the raw bytes mean, so those streams
+    are left untouched.  Indexed and colour 1-bit images are not handled here:
+    forcing ``/DeviceGray`` on them would reinterpret the bits.
+    """
+    if image.get("/Decode") is not None:
+        return
+    width = int(image.get("/Width", 0) or 0)
+    height = int(image.get("/Height", 0) or 0)
+    if width <= 0 or height <= 0:
+        return
+    try:
+        raster = image.read_bytes()
+    except Exception:
+        return
+    stride = (width + 7) // 8
+    if len(raster) != stride * height:
+        return
+    try:
+        payload = zopfli_compress(raster, iterations)
+    except Exception:
+        return
+    if len(payload) >= len(original_raw):
+        return
+    _apply_stream_update(
+        image, payload, filter_="/FlateDecode", colorspace="/DeviceGray",
+        width=width, height=height, bpc=1,
+    )
+    stats.bytes_saved += len(original_raw) - len(payload)
+    stats.images_optimized += 1
 
 
 def _smask_is_fully_opaque(smask: pikepdf.Object) -> bool:

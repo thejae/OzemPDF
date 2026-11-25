@@ -543,6 +543,11 @@ colour-converted.
 **FR-IMG-5** A stream's `/ColorSpace` MUST be written as `pikepdf.Name`, never a Python `str`: a
 string becomes a PDF *string* and renders as a blank page. `/Indexed` is
 `Array([Name("/Indexed"), Name(base), hival, String(palette)])`.
+**FR-IMG-6** A 1-bit `/DeviceGray` raster MUST be recompressed from its *decoded* bytes
+(`read_bytes()`), whose length MUST equal `ceil(width/8) × height`. Compressing the encoded stream
+and declaring `FlateDecode` makes it decode to a deflate blob, and Word draws some text runs as
+exactly this construct (colour image + 1-bit `/SMask`), so that mistake erases text (N-12). Streams
+with `/Decode`, and 1-bit images whose colour space is not `/DeviceGray`, MUST be left untouched.
 
 #### 4.6.4 `strip_jpeg_bloat_lossless`
 
@@ -1389,14 +1394,14 @@ server through `http.client`; no browser is required, and no Qt platform plugin 
 | Module | Tests | Verifies |
 | --- | --- | --- |
 | `python/tests/test_lossless.py` | 9 | Bit-identical pixels *and* identical decoded content bytes in Strict Lossless; guardrail keeps a tiny file (`kept_original_guardrail`, `already_optimal`); duplicate images, opaque `/SMask`, `/PieceInfo` and `/Thumb` removed; Max Slim strips metadata but Lossless keeps it; an image stream is only replaced when strictly smaller; vector-only documents are not rasterised; every preset still renders a page |
-| `python/tests/test_visually_lossless.py` | 9 | 600 effective DPI derived from the CTM; Balanced downsamples it and Max Slim is not larger; a screenshot becomes `/Indexed` rather than JPEG; a low-DPI image is left alone; Predictor-15 round-trips all five filters for bpp 1 and 3; Paeth matches reference values |
+| `python/tests/test_visually_lossless.py` | 12 | 600 effective DPI derived from the CTM; Balanced downsamples it and Max Slim is not larger; a screenshot becomes `/Indexed` rather than JPEG; a low-DPI image is left alone; a 1-bit mask keeps every decoded pixel; a `/Decode`-inverted mask is not re-encoded; the Word text-as-mask construct still renders; Predictor-15 round-trips all five filters for bpp 1 and 3; Paeth matches reference values |
 | `python/tests/test_security_and_fonts.py` | 15 | Owner-encrypted signed document is decrypted and flattened; permission restrictions removed without a password; a supplied password does not break permission-only files; a mixed batch shares one password; an open password without a credential is reported, not guessed; `"1234"` fails; inputs open read-only; a permission error is actionable; protection is classified; unsupported encryption is reported; flatten-disabled keeps the signature; a subset font is still a valid sfnt; re-signing produces a real `/ByteRange` signature; a wrong certificate password fails cleanly and leaves no output |
 | `python/tests/test_batch.py` | 15 | Sorted recursive discovery and previous-output exclusion; the three output modes; collision suffixing; empty suffix fallback; parallel ordering and progress; cancel stops dispatch but keeps finished work; thumbnails and page renders; a failed file leaves no temp and keeps the original; CLI single file with a JSON report; pure-JSON stdout; exit codes 1 and 2; localized help; flag mapping |
 | `python/tests/test_settings.py` | 6 | Whitelist-only persistence and secrets never persisted; portable data-dir override; corrupt and unwritable settings fall back silently; language round-trips through `AppState`; `from_preset` accepts an enum member |
 | `python/tests/test_i18n.py` | 7 | Translation and fallback; formatting errors return the template; unknown language keeps the current one; discovery and listeners; every static key exists; zero orphan keys; no empty values |
 | `python/tests/test_web.py` | 15 | Index serves the UI and sets the session cookie; the version chip matches `_version.py`; the API refuses a token-less request; static traversal is blocked; add → run → images; `fs/list` filters and hides; certificate picker; upload staging; a preset change keeps the destination; opening a missing output is reported, not raised; incremental queue after a run; row removal; preload paths queue on first load; protection kind is reported; language switch |
 
-Fixtures live in `python/tests/pdf_fixtures.py` (337 lines): flat and gradient rasters, an opaque `/SMask`,
+Fixtures live in `python/tests/pdf_fixtures.py` (418 lines): flat and gradient rasters, an opaque `/SMask`,
 duplicate images, `/PieceInfo`/`/Thumb`/XMP bloat, a synthetic TrueType font built with
 `FontBuilder`, an owner-encrypted PDF with a visible signature widget, an open-password PDF, an
 unsupported-encryption PDF, and a nested folder tree.
@@ -1775,7 +1780,7 @@ Line counts are indicative (§1.3). `web/fonts/` holds the OFL texts alongside t
 | `python/src/ozempdf/engine/unlock.py` | 545 | read-only open, protection classification, signature flattening |
 | `python/src/ozempdf/engine/analyzer.py` | 685 | byte audit, CTM/DPI analysis |
 | `python/src/ozempdf/engine/deduplicator.py` | 637 | SHA-256 resource dedup, opaque `/SMask` removal |
-| `python/src/ozempdf/engine/image_optimizer.py` | 744 | image modes A/B, classification, JPEG stripping, predictor |
+| `python/src/ozempdf/engine/image_optimizer.py` | 784 | image modes A/B, classification, JPEG stripping, 1-bit masks, predictor |
 | `python/src/ozempdf/engine/font_optimizer.py` | 628 | font subsetting, CMap recompression |
 | `python/src/ozempdf/engine/stream_optimizer.py` | 240 | bloat stripping, Zopfli streams |
 | `python/src/ozempdf/engine/signing.py` | 92 | PKCS#12 re-signing, timestamps |
@@ -1795,9 +1800,9 @@ Line counts are indicative (§1.3). `web/fonts/` holds the OFL texts alongside t
 | `python/scripts/make_icon.py` | 66 | icon generator (accent tile + document mark) |
 | `python/scripts/build_cross_platform.py` | 135 | PyInstaller driver (one-dir engine) |
 | `python/tests/conftest.py` | 111 | fixtures and pixel helpers |
-| `python/tests/pdf_fixtures.py` | 337 | synthetic PDF builders |
+| `python/tests/pdf_fixtures.py` | 418 | synthetic PDF builders |
 | `python/tests/test_lossless.py` | 110 | Mode A and guardrail |
-| `python/tests/test_visually_lossless.py` | 131 | DPI, Mode B, predictor |
+| `python/tests/test_visually_lossless.py` | 209 | DPI, Mode B, 1-bit masks, predictor |
 | `python/tests/test_security_and_fonts.py` | 288 | protection, signatures, fonts |
 | `python/tests/test_batch.py` | 228 | discovery, mapping, pool, CLI |
 | `python/tests/test_settings.py` | 113 | persistence, data dir, presets |

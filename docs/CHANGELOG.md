@@ -4,6 +4,23 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.6 — 2026-11-25
+
+### Fixed
+
+- **Every 1-bit image was recompressed into garbage, which erased text lines.** Word draws some
+  text runs as a tiny colour image covered by a 1-bit bitmap `/SMask`; the 1-bit branch read the
+  stream's *encoded* bytes, ran them through zopfli and stored the result as the new
+  `FlateDecode` payload. The stream then decoded to a deflate blob instead of a raster, so the mask
+  rendered as a noise strip and the sentence under it vanished. The raster is now decoded
+  (`read_bytes()`), checked against the expected `ceil(width/8) × height` length, and only
+  rewritten when the candidate is smaller. Indexed or colour 1-bit images keep their colour space
+  (forcing `/DeviceGray` reinterpreted them), and streams with `/Decode` are left untouched.
+  Covered by `test_bilevel_mask_keeps_every_pixel`,
+  `test_bilevel_mask_with_decode_is_not_reencoded` and `test_text_mask_overlay_still_renders`; the
+  reported CV now renders its heading and every sentence, with extracted text identical to the
+  source.
+
 ## 0.3.5 — 2026-11-25
 
 ### Fixed

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pikepdf
 import pytest
-from conftest import image_streams, nonwhite_pixels
+from conftest import image_streams, nonwhite_pixels, pixel_difference
 
 from ozempdf.config import CompressionConfig
 from ozempdf.engine import calculate_effective_image_dpis, compress_pdf_file
@@ -67,6 +67,84 @@ def test_low_density_image_is_not_downsampled(tmp_path: Path) -> None:
     assert result.success
     assert result.images_downsampled == 0
     assert (image_streams(output)[0]["width"], image_streams(output)[0]["height"]) == (600, 400)
+
+
+# --------------------------------------------------------------------------- #
+# 1-bit masks (Word renders some text runs as a tiny colour image + 1-bit SMask)
+# --------------------------------------------------------------------------- #
+
+
+def _bilevel_rasters(path: Path) -> list[tuple[int, int, str, bytes]]:
+    """Decoded raster of every 1-bit image, so compression can be checked."""
+    found = []
+    with pikepdf.open(path) as pdf:
+        for obj in pdf.objects:
+            if not isinstance(obj, pikepdf.Stream) or obj.get("/Subtype") != "/Image":
+                continue
+            if int(obj.get("/BitsPerComponent", 8) or 8) != 1:
+                continue
+            try:
+                raster = obj.read_bytes()
+            except Exception:
+                raster = b""
+            found.append(
+                (
+                    int(obj.get("/Width", 0) or 0),
+                    int(obj.get("/Height", 0) or 0),
+                    str(obj.get("/ColorSpace", "")),
+                    raster,
+                )
+            )
+    return sorted(found, key=lambda item: (item[0], item[1], len(item[3])))
+
+
+def test_bilevel_mask_keeps_every_pixel(assets, tmp_path: Path) -> None:
+    """Recompressing a 1-bit mask must not shrink it to a deflated blob."""
+    before = _bilevel_rasters(assets.bilevel)
+    output = tmp_path / "bilevel.pdf"
+    result = compress_pdf_file(assets.bilevel, output, CompressionConfig.from_preset("balanced"))
+
+    assert result.success, result.error_message
+    assert result.images_optimized >= 1, "the 1-bit stream should be recompressed"
+    assert _bilevel_rasters(output) == before
+    assert pixel_difference(assets.bilevel, output) < 0.01
+
+
+def test_bilevel_mask_with_decode_is_not_reencoded(assets, tmp_path: Path) -> None:
+    """A ``/Decode`` inversion changes what the bytes mean, so leave it alone."""
+    output = tmp_path / "bilevel-inverted.pdf"
+    result = compress_pdf_file(
+        assets.bilevel_inverted, output, CompressionConfig.from_preset("balanced")
+    )
+    assert result.success, result.error_message
+
+    with pikepdf.open(assets.bilevel_inverted) as source, pikepdf.open(output) as compressed:
+        def only_mask(pdf) -> pikepdf.Object:
+            matches = [
+                obj
+                for obj in pdf.objects
+                if isinstance(obj, pikepdf.Stream)
+                and obj.get("/Subtype") == "/Image"
+                and int(obj.get("/BitsPerComponent", 8) or 8) == 1
+            ]
+            assert len(matches) == 1
+            return matches[0]
+
+        original = only_mask(source)
+        stored = only_mask(compressed)
+        assert stored.get("/Decode") is not None
+        assert stored.read_raw_bytes() == original.read_raw_bytes()
+
+
+def test_text_mask_overlay_still_renders(assets, tmp_path: Path) -> None:
+    """The Word text-as-mask construct must keep its text after compression."""
+    output = tmp_path / "text-mask.pdf"
+    result = compress_pdf_file(assets.text_mask, output, CompressionConfig.from_preset("balanced"))
+
+    assert result.success, result.error_message
+    assert nonwhite_pixels(output) > 100
+    assert pixel_difference(assets.text_mask, output) < 0.01
+    assert any("Indexed" in image["colorspace"] for image in image_streams(output))
 
 
 # --------------------------------------------------------------------------- #

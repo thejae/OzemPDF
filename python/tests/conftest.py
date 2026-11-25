@@ -14,12 +14,15 @@ if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
 from pdf_fixtures import (  # noqa: E402
+    build_bilevel_inverted_pdf,
+    build_bilevel_pdf,
     build_bloat_pdf,
     build_font_pdf,
     build_lossless_pdf,
     build_photo_pdf,
     build_protected_pdf,
     build_signed_encrypted_pdf,
+    build_text_mask_pdf,
     build_tiny_pdf,
     build_ui_pdf,
 )
@@ -38,6 +41,9 @@ def assets(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
         font=build_font_pdf(base / "font.pdf"),
         signed=build_signed_encrypted_pdf(base / "signed.pdf"),
         protected=build_protected_pdf(base / "protected.pdf", password="secret"),
+        bilevel=build_bilevel_pdf(base / "bilevel.pdf"),
+        bilevel_inverted=build_bilevel_inverted_pdf(base / "bilevel-inverted.pdf"),
+        text_mask=build_text_mask_pdf(base / "text-mask.pdf"),
     )
 
 
