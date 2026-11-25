@@ -1,6 +1,11 @@
 # OzemPDF
 
-**v0.3.3** — surgical lossless and visually-lossless PDF slimming.
+[![ci](https://github.com/thejae/OzemPDF/actions/workflows/ci.yml/badge.svg)](https://github.com/thejae/OzemPDF/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/thejae/OzemPDF?label=release)](https://github.com/thejae/OzemPDF/releases/latest)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](pyproject.toml)
+
+**Surgical lossless and visually-lossless PDF slimming.**
 
 OzemPDF makes PDFs smaller without re-distilling pages. It never rasterizes page content and
 never rewrites vector or text operators; it performs object-level surgery on embedded images,
@@ -13,11 +18,14 @@ font programs, deflate streams, metadata and the cross-reference structure.
 - **The interface is plain HTML/CSS/JS**, served by the Python engine and wrapped by an Electron
   window on Windows, macOS and Linux.
 
+The portable Windows ZIP ships its own frozen engine, so it needs neither Python nor Node. Running
+from source needs Python 3.10+ (and Node 22+ for the desktop shell).
+
 ## Quick start — launch the app
 
 | What you want | Where to go |
 | --- | --- |
-| Use the packaged Windows app | extract `release/OzemPDF-<version>-win.zip` to a writable folder and run `OzemPDF.exe` |
+| Use the packaged Windows app | download the ZIP from [Releases](https://github.com/thejae/OzemPDF/releases), extract it to a writable folder and run `OzemPDF.exe` |
 | Run the desktop shell from source | `cd electron && npm install && npm start` (after `pip install -e ".[dev]"`) |
 | Run without Node or Electron | `ozempdf --serve` |
 
@@ -103,9 +111,10 @@ there as expected.
 
 ### Windows: portable, no installer
 
-The Windows build is a single **portable ZIP**: `release/OzemPDF-0.3.5-win.zip`. There is no
-installer, no registry entry, no Program Files copy and no uninstaller. Extract it anywhere
-writable (for example `D:\OzemPDF`) and run from there; do not run it from inside the ZIP.
+The Windows build is a single **portable ZIP** — `OzemPDF-<version>-win.zip`, published on the
+[Releases page](https://github.com/thejae/OzemPDF/releases). There is no installer, no registry
+entry, no Program Files copy and no uninstaller. Extract it anywhere writable (for example
+`D:\OzemPDF`) and run from there; do not run it from inside the ZIP.
 
 1. `OzemPDF.exe` — the desktop app. On a normal PC, extract the ZIP to a writable folder (Desktop,
    `D:\OzemPDF`, a USB stick) and double-click this file; no command line or shortcut flags needed.
@@ -233,6 +242,7 @@ self-extracting portable exe, so nothing is written to the system temp directory
 ## Repository layout
 
 ```
+.github/                CI workflow and community files
 electron/               Electron main + preload, launchers, icon assets, packaging config
 python/src/ozempdf/     Python engine, CLI, HTTP server, locales, web UI
 python/src/ozempdf/web/ index.html, styles.css, app.js, fonts
@@ -257,12 +267,25 @@ source of truth; [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) is the human-rea
   Electron shell can).
 - PDF/A and PDF/X conformance are not validated.
 
-Three documents describe the project in depth: [`docs/TECHNICAL_SPECIFICATION.md`](docs/TECHNICAL_SPECIFICATION.md)
-(the current-state specification of the engine, CLI, API and interface),
-[`docs/USER_STORIES.md`](docs/USER_STORIES.md) (personas, epics, acceptance criteria, traceability) and
-[`docs/DISCREPANCIES.md`](docs/DISCREPANCIES.md) (every defect from the previous PySide6 architecture,
-how it was resolved, and what the rebuild introduced). The third-party inventory — Python, Node and
-the vendored fonts with their licenses — is [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
+The documentation lives in [`docs/`](docs/):
+
+- [`TECHNICAL_SPECIFICATION.md`](docs/TECHNICAL_SPECIFICATION.md) — the current-state specification of
+  the engine, CLI, API and interface
+- [`USER_STORIES.md`](docs/USER_STORIES.md) — personas, epics, acceptance criteria and traceability
+- [`DISCREPANCIES.md`](docs/DISCREPANCIES.md) — every defect from the previous PySide6 architecture,
+  how it was resolved, and what the rebuild introduced
+- [`DESIGN.md`](docs/DESIGN.md) — the design contract (palette, typography, motion, accessibility)
+- [`PRODUCT.md`](docs/PRODUCT.md) — product truth and brand commitments
+- [`CHANGELOG.md`](docs/CHANGELOG.md) — every notable change per version
+- [`DEPENDENCIES.md`](docs/DEPENDENCIES.md) — the third-party inventory (Python, Node and the
+  vendored fonts) with licenses
+
+## Contributing
+
+Issues and pull requests are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the development
+setup, the invariant contract, the gates every change must pass and the commit convention. Security
+reports go through the private channel described in [`SECURITY.md`](SECURITY.md), and participation
+is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

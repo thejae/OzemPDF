@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a capability or an improvement
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        OzemPDF has two invariants: page content is never rasterized or rewritten, and a file never
+        grows except through the transformations a user explicitly asks for. Requests that need
+        either invariant to bend are out of scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the situation, not only the feature. Real documents and workflows help.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other tools, flags or workflows you tried.
+
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: Invariant check
+      options:
+        - label: The proposal does not rasterize or rewrite page content.
+          required: true
+        - label: The proposal does not grow a file (except the explicit unlock/flatten/sign paths).
+          required: true

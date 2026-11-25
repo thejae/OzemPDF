@@ -6,15 +6,20 @@ build/
 dist/
 artifacts/
 .venv/
-.venv_win/
+.venv*/
+venv/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 
 # Node / Electron
-electron/node_modules/
+node_modules/
 electron/.dev-data/
 release/
 npm-debug.log*
+
+# Runtime application data (a frozen engine keeps data/ beside itself)
+data/
 
 # Generated visual artefacts
 shots/
@@ -22,6 +27,7 @@ shots/
 # Tooling metadata
 .codegraph/
 
-# OS
+# OS / editors
 Thumbs.db
 .DS_Store
+.idea/

@@ -5,8 +5,19 @@
   "private": true,
   "description": "OzemPDF desktop shell — surgical lossless PDF slimming",
   "main": "main.js",
-  "author": "OzemPDF",
+  "author": {
+    "name": "OzemPDF contributors",
+    "url": "https://github.com/thejae/OzemPDF"
+  },
   "license": "MIT",
+  "homepage": "https://github.com/thejae/OzemPDF#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thejae/OzemPDF.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thejae/OzemPDF/issues"
+  },
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win zip"

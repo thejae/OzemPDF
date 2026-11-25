@@ -5,6 +5,26 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ozempdf"
 description = "Surgical lossless and visually-lossless PDF slimming with a local web UI"
+authors = [{ name = "OzemPDF contributors" }]
+maintainers = [{ name = "thejae", email = "738694+thejae@users.noreply.github.com" }]
+keywords = ["pdf", "pdf-compression", "compression", "lossless", "image-optimization", "pikepdf", "electron", "offline", "privacy", "document-processing"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Environment :: Web Environment",
+  "Intended Audience :: End Users/Desktop",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Multimedia :: Graphics",
+  "Topic :: Office/Business",
+  "Topic :: System :: Archiving :: Compression",
+]
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -20,7 +40,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4", "pyinstaller>=6.0"]
+dev = ["pytest>=7.4", "pyinstaller>=6.0", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/thejae/OzemPDF"
+Repository = "https://github.com/thejae/OzemPDF"
+Issues = "https://github.com/thejae/OzemPDF/issues"
+Changelog = "https://github.com/thejae/OzemPDF/blob/main/docs/CHANGELOG.md"
+Documentation = "https://github.com/thejae/OzemPDF/blob/main/docs/TECHNICAL_SPECIFICATION.md"
 
 [project.scripts]
 ozempdf = "ozempdf.__main__:main"

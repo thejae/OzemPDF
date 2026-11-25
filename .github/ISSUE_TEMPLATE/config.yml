@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/thejae/OzemPDF/security/advisories/new
+    about: Please report vulnerabilities privately, never in a public issue.
+  - name: Technical specification
+    url: https://github.com/thejae/OzemPDF/blob/main/docs/TECHNICAL_SPECIFICATION.md
+    about: The current-state specification of the engine, CLI, API and interface.
+  - name: Contributing guide
+    url: https://github.com/thejae/OzemPDF/blob/main/CONTRIBUTING.md
+    about: Development setup, gates and commit conventions.

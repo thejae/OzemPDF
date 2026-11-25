@@ -1,3 +1,19 @@
+# Normalise text on commit; binaries are detected automatically.
+* text=auto
+
 # Windows launchers must keep CRLF line endings to behave in cmd.exe.
 *.cmd text eol=crlf
 *.bat text eol=crlf
+
+# Shell scripts must keep LF line endings.
+*.sh text eol=lf
+
+# Binary assets: never diff, never normalise.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff2 binary
+*.woff binary
+*.zip binary
+*.pdf binary

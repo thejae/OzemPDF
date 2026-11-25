@@ -26,7 +26,7 @@ Declared in `pyproject.toml` under `[project.optional-dependencies].dev`.
 | --- | --- | --- |
 | `pytest` | `>=7.4` | Test suite (`python -m pytest -q`) |
 | `pyinstaller` | `>=6.0` | Frozen engine build (`python python/scripts/build_cross_platform.py`) |
-| `ruff` | installed by CI and the developer | Lint gate (`ruff check python/src python/tests`) |
+| `ruff` | `>=0.6` | Lint gate (`ruff check python/src python/tests`); installed with the `dev` extra |
 
 ## Node / Electron
 

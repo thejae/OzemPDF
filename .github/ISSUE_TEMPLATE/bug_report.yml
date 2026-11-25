@@ -1,0 +1,93 @@
+name: Bug report
+description: Something is broken, or a PDF came out wrong
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Do not attach confidential documents** — a synthetic or redacted
+        file that reproduces the problem is usually enough.
+
+  - type: input
+    id: version
+    attributes:
+      label: OzemPDF version
+      description: The version chip in the app header, or the output of `ozempdf --version`.
+      placeholder: v0.3.14
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running it?
+      options:
+        - Portable Windows ZIP
+        - Electron from source (npm start)
+        - Browser fallback (ozempdf --serve)
+        - Command line
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: Windows 11 24H2 / macOS 15.1 / Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a signed PDF to the queue
+        2. Pick "Max slim"
+        3. Run
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: The error message, the exit code, or what the output PDF looks like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: document
+    attributes:
+      label: The input document
+      description: >
+        Characteristics only — page count, file size, scanned or text, images, embedded fonts,
+        signatures, encryption. Attach the file only if it is not confidential.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Desktop builds write `data\main.log` beside the executable; the CLI writes to stderr. Paste
+        the relevant lines (remove any paths or names you do not want public).
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues for this problem.
+          required: true
+        - label: The document I attached (if any) is not confidential.
+          required: true

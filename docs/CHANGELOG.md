@@ -10,6 +10,22 @@ All notable changes to OzemPDF are documented here. The format follows
 
 - **Clicking outside the inspector dismisses it.** A press on the backdrop closes the modal; a press
   that starts inside (a pan or wipe drag that happens to end outside the dialog) does not.
+- **Publication metadata and community files.** `pyproject.toml` and `electron/package.json` carry
+  repository URLs, keywords, classifiers and author details; `CONTRIBUTING.md`, `SECURITY.md`,
+  `CODE_OF_CONDUCT.md`, issue forms, a pull-request template, `CODEOWNERS` and Dependabot document
+  how to contribute, report defects and disclose vulnerabilities.
+- **A package-metadata job in CI.** Every push and pull request builds an sdist, so a broken
+  `pyproject.toml` fails before it reaches a release.
+
+### Changed
+
+- **The README can no longer drift from the released version.** The hardcoded `v0.3.3` header and
+  the `release/OzemPDF-0.3.5-win.zip` path are gone: the version is a release badge and the portable
+  ZIP is described as published on the Releases page.
+- **`AGENTS.md` no longer names a machine-local key path.** The signing rule now says to use the
+  locally configured key and never commit a key, a passphrase or a path outside the repository.
+- **Repository hygiene.** `.gitattributes` normalises text and marks binaries, `.gitignore` covers
+  the runtime `data/` folder, and `.editorconfig` records the existing indentation and line endings.
 
 ### Fixed
 
