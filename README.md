@@ -232,6 +232,7 @@ API, locale key coverage, and that signing produces a real signature.
 ```bash
 python python/scripts/build_cross_platform.py   # frozen engine -> artifacts/dist/engine/ozempdf-engine/ozempdf-engine[.exe]
 cd electron && npm run dist                     # portable ZIP -> release/OzemPDF-<version>-win.zip
+cd electron && npm run dist:linux               # AppImage + deb -> release/OzemPDF-<version>-linux-<arch>.*
 ```
 
 The engine is a PyInstaller directory build carrying `locales/`, `web/` and fonts; the Electron
@@ -242,6 +243,10 @@ exercise the frozen sidecar locally.
 The ZIP is the only Windows artifact. It contains the desktop app, the two launchers and the frozen
 engine; the app writes into `data/` inside the extracted folder. There is no NSIS installer and no
 self-extracting portable exe, so nothing is written to the system temp directory or the registry.
+
+Linux packages are built on Linux, because PyInstaller cannot cross-compile: CI freezes the engine on
+Ubuntu and runs electron-builder for an unsigned `.AppImage` and `.deb`. The Windows `.cmd` launchers
+ship only in the Windows ZIP.
 
 ## Repository layout
 

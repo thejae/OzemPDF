@@ -6,6 +6,13 @@ All notable changes to OzemPDF are documented here. The format follows
 
 ## 0.3.15 — 2026-11-25
 
+### Added
+
+- **Linux packages are built in CI.** A `package-linux` job freezes the engine on Ubuntu and runs
+  electron-builder for an AppImage and a deb, verifies the frozen engine and extracts the AppImage
+  to check the bundled engine, then uploads both artifacts. The Windows `.cmd` launchers are now
+  scoped to the Windows bundle with `win.extraFiles`.
+
 ### Changed
 
 - **The discrepancy ledger is current again.** It records N-14 and N-15, retires the frozen
