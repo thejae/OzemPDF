@@ -11,6 +11,9 @@ All notable changes to OzemPDF are documented here. The format follows
 - **The discrepancy ledger is current again.** It records N-14 and N-15, retires the frozen
   0.3.3-era string counts, version claim and developer-path fragment, and corrects D-01's evidence
   wording — the docs name no encoder brand, they simply no longer mention MozJPEG.
+- **The ledger states its own status.** A banner and an at-a-glance table say that all 36 defects
+  are closed and that only the Deferred section is open, so the page reads as history rather than a
+  backlog.
 
 ### Fixed
 

@@ -1,5 +1,16 @@
 # Discrepancy ledger — 0.3.x architecture
 
+> **Status: all closed.** Every defect recorded here — `D-01` … `D-21` and `N-01` … `N-15` — is
+> resolved and backed by a test or a code path in this repository, and every user-facing gap and
+> story listed has shipped. This page is the project's historical record, not a backlog; the only
+> open work is the [Deferred](#deferred-documented-not-implemented) section.
+
+| Range | Entries | State |
+| --- | --- | --- |
+| `D-01` … `D-21` | 21 | closed — a test or a code path per row |
+| `N-01` … `N-15` | 15 | closed — a test or a code path per row |
+| Deferred | 8 | open — documented, not defects |
+
 The technical specification recorded 21 defects (`D-01` … `D-21`) in the PySide6 build, plus five
 user-facing gaps (`US-004`, `US-036`, `US-051`, `US-052`, `US-053`). This page records what happened
 to each one in the HTML/CSS + Python architecture, then the defects that surfaced while building it,
