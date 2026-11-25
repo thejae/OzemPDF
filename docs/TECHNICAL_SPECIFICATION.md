@@ -696,7 +696,13 @@ filter applies to scans only, never to explicit files.
   message instead of failing the whole add.
 - `render_page_png(path, page_index, zoom_percent…)` — renders through pypdfium2 with the zoom
   clamped so `longest_side * zoom ≤ 3400`, encodes PNG, and returns `None` on any failure. The
-  interface requests a thumbnail for the queue and a larger render for the inspector.
+  interface requests a thumbnail for the queue and a larger render for the inspector. PDFium is
+  **not thread-safe**, so every call (open, page, render, close) runs under one module lock; the
+  inspector asks for both halves at once and the thumbnail pool runs in parallel, and overlapping
+  calls corrupt PDFium's global state, after which every later render fails. When PDFium refuses a
+  document that qpdf can still reconstruct — a lost cross-reference table, for instance — the page
+  is rendered from a repaired in-memory copy; no file on disk is touched. A document password
+  supplied for the run is kept in the row (in memory only) and used for its previews.
 
 ### 5.3 Execution (`run_batch_compression`)
 
@@ -1012,6 +1018,8 @@ Interaction: dragging near the divider wipes, dragging elsewhere pans, the wheel
 `←`/`→` step pages, `+`/`=`/`-` zoom and `R` resets. Pages are rendered by `/api/page` with
 `scale = clamp(1.15 * (zoom/200), 0.5, 3400/longest_side)` so a huge page cannot stall the dialog.
 The footer holds the wipe slider (2–98), the percentage readout, a pan hint, `Open file` and `Done`.
+A page the engine cannot rasterise shows a localized notice over the canvas instead of leaving a
+silent dark stage; the file on disk is untouched.
 
 ### 7.11 Drag and drop
 
@@ -1082,7 +1090,7 @@ first paint to avoid a flash.
 | --- | --- | --- |
 | HTTP requests | `ThreadingHTTPServer` request threads | a slow request must not block the UI or a batch |
 | Batch compression | one dedicated run thread per `/api/run/start`, which dispatches files to a `ProcessPoolExecutor` | the UI keeps answering `/api/run` polls while files compress |
-| Thumbnails and page renders | `ThreadPoolExecutor(2)` in `AppState` | bounded parallel rendering without competing with the batch |
+| Thumbnails and page renders | `ThreadPoolExecutor(2)` in `AppState`, plus request threads for `/api/page` | bounded parallel rendering without competing with the batch; every PDFium call is serialized by one lock because PDFium is not thread-safe |
 | Compression itself | worker processes, one file each | CPU-bound; the GIL would serialize threads |
 
 The UI never blocks on a compression call: it polls `/api/run`, which returns the live queue,

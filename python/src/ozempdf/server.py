@@ -178,13 +178,18 @@ class AppState:
             "result": None,
             "thumb": None,
             "thumb_version": 0,
+            # Session-only credential for rendering previews; never persisted and
+            # never included in _item_view. The compressed output is always plain.
+            "password": password,
         }
 
     def _schedule_thumbnail(self, item: dict) -> None:
         """Render the page-1 thumbnail off the request thread."""
 
         def work() -> None:
-            data = render_page_thumbnail_png(Path(item["path"]), max_dimension=110)
+            data = render_page_thumbnail_png(
+                Path(item["path"]), max_dimension=110, password=item.get("password", "")
+            )
             with self.lock:
                 item["thumb"] = data
                 item["thumb_version"] += 1
@@ -261,7 +266,14 @@ class AppState:
                 return {"ok": False, "error": t("errors.nothing_to_slim")}
             for key in targets:
                 item = self.items[key]
-                item.update(status="processing", result=None, error="")
+                item.update(
+                    status="processing",
+                    result=None,
+                    error="",
+                    # A run without a password keeps whatever the row was added
+                    # with, so its preview still opens.
+                    password=password or item.get("password", ""),
+                )
             self.stop_requested = False
             self.running = True
             self.run_cancelled = False
@@ -610,10 +622,13 @@ class Handler(BaseHTTPRequestHandler):
             if item is None:
                 return self._error(HTTPStatus.NOT_FOUND, t("errors.not_found"))
             source = item["path"]
+            password = item.get("password", "")
             result = item["result"]
             if side == "slim" and result and result.get("success"):
                 source = result.get("output_path") or source
-        data = render_page_png(Path(source), page_index=page - 1, zoom_percent=zoom)
+        data = render_page_png(
+            Path(source), page_index=page - 1, zoom_percent=zoom, password=password
+        )
         if not data:
             return self._error(HTTPStatus.NOT_FOUND, t("errors.render_failed"))
         self._send(HTTPStatus.OK, data, "image/png", {"Cache-Control": "private, max-age=300"})

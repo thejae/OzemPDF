@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from pathlib import Path
 
-from pdf_fixtures import build_nested_folder_tree, build_tiny_pdf
+import pypdfium2 as pdfium
+import pytest
+from pdf_fixtures import (
+    build_nested_folder_tree,
+    build_protected_pdf,
+    build_tiny_pdf,
+    build_truncated_pdf,
+)
 
 from ozempdf.config import CompressionConfig, OutputMode
 from ozempdf.engine import (
@@ -131,6 +140,91 @@ def test_thumbnails_and_page_rendering(assets, tmp_path: Path) -> None:
     large = render_page_png(assets.ui, zoom_percent=200)
     assert small and large
     assert len(large) > len(small)
+
+
+def test_page_renders_are_serialized_for_pdfium(assets, monkeypatch: pytest.MonkeyPatch) -> None:
+    """N-13: every PDFium call runs under one lock.
+
+    PDFium is not thread-safe. The inspector asks for the original and slimmed
+    halves on two connections at once and the thumbnail pool renders in
+    parallel; overlapping calls corrupt PDFium's global state and every later
+    render fails, which is the permanently dark inspector. Asserting that two
+    renders never run at the same time pins the fix, not the timing of a race.
+    """
+    import ozempdf.engine.batch as batch_module
+
+    original = batch_module._render_with_pdfium
+    guard = threading.Lock()
+    active = 0
+    peak = 0
+
+    def probe(*args, **kwargs):
+        nonlocal active, peak
+        with guard:
+            active += 1
+            peak = max(peak, active)
+        try:
+            time.sleep(0.05)
+            return original(*args, **kwargs)
+        finally:
+            with guard:
+                active -= 1
+
+    monkeypatch.setattr(batch_module, "_render_with_pdfium", probe)
+    threads = [
+        threading.Thread(target=render_page_png, args=(assets.ui,), kwargs={"max_dimension": 64})
+        for _ in range(4)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert peak == 1
+
+
+def test_concurrent_page_renders_keep_working(assets) -> None:
+    """After concurrent renders PDFium must still render (the old race poisoned it)."""
+    results: list[bytes | None] = []
+    guard = threading.Lock()
+
+    def render() -> None:
+        data = render_page_png(assets.ui, max_dimension=96)
+        with guard:
+            results.append(data)
+
+    for _ in range(2):
+        barrier = threading.Barrier(2)
+
+        def racing_render(barrier: threading.Barrier = barrier) -> None:
+            barrier.wait(timeout=30)
+            render()
+
+        threads = [threading.Thread(target=racing_render) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=60)
+    assert len(results) == 4
+    assert all(results), "a concurrent render returned no PNG"
+    # The old race left PDFium unable to render anything afterwards.
+    assert render_page_png(assets.ui, max_dimension=96)
+
+
+def test_truncated_pdf_renders_from_a_repaired_copy(tmp_path: Path) -> None:
+    """A file without a cross-reference table previews via qpdf's rebuild."""
+    damaged = build_truncated_pdf(tmp_path / "truncated.pdf")
+    with pytest.raises(pdfium.PdfiumError):
+        pdfium.PdfDocument(str(damaged)).close()
+    png = render_page_png(damaged, zoom_percent=100)
+    assert png and png.startswith(b"\x89PNG")
+
+
+def test_protected_document_page_renders_with_its_password(tmp_path: Path) -> None:
+    """The preview must use the password the run used, not the empty one."""
+    protected = build_protected_pdf(tmp_path / "protected.pdf", password="secret")
+    assert render_page_png(protected, zoom_percent=100) is None
+    png = render_page_png(protected, zoom_percent=100, password="secret")
+    assert png and png.startswith(b"\x89PNG")
 
 
 def test_failed_file_leaves_no_temp_and_keeps_the_original(tmp_path: Path) -> None:

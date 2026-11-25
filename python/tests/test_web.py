@@ -78,7 +78,7 @@ def test_index_serves_ui_and_sets_session_cookie(live) -> None:
     status, body, _headers = client.get("/api/bootstrap")
     assert status == 200
     payload = _json(body)
-    assert payload["version"] == "0.3.6"
+    assert payload["version"] == "0.3.7"
     assert "header.step1" in payload["strings"]
     assert payload["queue"] == []
 
@@ -323,6 +323,28 @@ def test_queue_reports_protection_kind(live, assets) -> None:
     assert restricted["locked"] is False
     assert locked["protection"] == "password"
     assert locked["locked"] is True
+
+
+def test_inspector_renders_protected_pages_after_a_password(live, assets) -> None:
+    """The preview keeps the row's password in memory; N-13's dark canvas fix."""
+    _state, base = live
+    client = Client(base)
+    client.get("/")
+    _status, body, _headers = client.post(
+        "/api/queue/add", {"paths": [str(assets.protected)], "password": "secret"}
+    )
+    item = _json(body)["queue"][0]
+    status, page, headers = client.get(f"/api/page?id={item['id']}&side=orig&page=1&zoom=200")
+    assert status == 200
+    assert page.startswith(b"\x89PNG")
+    assert headers["Content-Type"] == "image/png"
+    # The thumbnail is rendered off-thread with the same credential.
+    for _ in range(100):
+        _status, body, _headers = client.get("/api/bootstrap")
+        if _json(body)["queue"][0]["has_thumb"]:
+            break
+        time.sleep(0.05)
+    assert _json(body)["queue"][0]["has_thumb"] is True
 
 
 def test_ui_language_switch(live) -> None:

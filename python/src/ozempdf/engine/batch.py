@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import io
 import os
+import threading
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import pikepdf
 
@@ -20,6 +22,19 @@ log = get_logger()
 
 DEFAULT_SUFFIX = "_compressed"
 TEMP_PREFIX = ".ozempdf_"
+
+# PDFium is not thread-safe (pypdfium2 releases the GIL around every call). The
+# inspector requests its original and slimmed halves on two connections at once
+# and the thumbnail pool renders in parallel, so two renders can overlap and
+# corrupt PDFium's global state — after which *every* later page render fails
+# and the inspector stays dark until the app restarts (N-13). One lock around
+# every PDFium call is the whole fix.
+_PDFIUM_LOCK = threading.Lock()
+
+# Returned by _render_with_pdfium when PDFium refused to load the document, as
+# opposed to loading it and finding no such page. Only the former is worth
+# retrying from a repaired copy.
+_OPEN_FAILED = object()
 
 
 class BatchCancelledError(Exception):
@@ -265,14 +280,56 @@ def render_page_png(
     Either *scale* is used directly, *zoom_percent* maps 200 % to 1.15× and is
     capped so a huge page cannot stall the inspector, or *max_dimension* picks a
     scale clamped to ``[0.15, 2.0]`` for a thumbnail.
+
+    Renders are serialized because PDFium is not thread-safe. When PDFium
+    refuses a document that qpdf can still reconstruct — PDFium demands an
+    intact cross-reference table, qpdf scans and rebuilds one — the page is
+    rendered from a repaired in-memory copy. Nothing is written to disk.
     """
     try:
         import pypdfium2 as pdfium
     except ImportError:
         return None
+    target = Path(path)
+    with _PDFIUM_LOCK:
+        data = _render_with_pdfium(
+            pdfium, str(target), page_index, max_dimension, scale, zoom_percent, password
+        )
+        if data is not _OPEN_FAILED:
+            return data
+        repaired = _repaired_pdf_bytes(target, password)
+        if repaired is None:
+            log.debug("page render failed for %s (page %s)", target, page_index + 1)
+            return None
+        return _render_with_pdfium(pdfium, repaired, page_index, max_dimension, scale, zoom_percent, "")
+
+
+def _render_with_pdfium(
+    pdfium: Any,
+    source: str | bytes,
+    page_index: int,
+    max_dimension: int | None,
+    scale: float | None,
+    zoom_percent: float | None,
+    password: str,
+) -> bytes | None | object:
+    """Render one page from a path or PDF byte buffer.
+
+    Returns PNG bytes, ``None`` when the document loaded but the page or its
+    raster failed, or :data:`_OPEN_FAILED` when the document itself would not
+    load (which a repaired copy may still fix).
+    """
     document = None
     try:
-        document = pdfium.PdfDocument(str(path), password=password or None)
+        if isinstance(source, bytes):
+            # pypdfium2 keeps the buffer alive for the document's lifetime.
+            document = pdfium.PdfDocument(source)
+        else:
+            document = pdfium.PdfDocument(source, password=password or None)
+    except Exception as exc:
+        log.debug("pdfium refused %s: %s", source if isinstance(source, str) else "<repaired>", exc)
+        return _OPEN_FAILED
+    try:
         if page_index < 0 or page_index >= len(document):
             return None
         page = document[page_index]
@@ -288,7 +345,8 @@ def render_page_png(
         buffer = io.BytesIO()
         image.save(buffer, format="PNG", optimize=True)
         return buffer.getvalue()
-    except Exception:
+    except Exception as exc:
+        log.debug("page raster failed: %s", exc)
         return None
     finally:
         if document is not None:
@@ -296,6 +354,30 @@ def render_page_png(
                 document.close()
             except Exception:
                 pass
+
+
+def _repaired_pdf_bytes(path: Path, password: str) -> bytes | None:
+    """Re-save *path* through qpdf so a strict renderer can open it.
+
+    PDFium rejects documents that have lost their cross-reference table even
+    when every object is intact (a truncated or badly finalised file); qpdf
+    scans the objects and rebuilds the table. The repaired bytes exist only for
+    the lifetime of the render.
+    """
+    buffer = io.BytesIO()
+    try:
+        try:
+            pdf = pikepdf.open(path)
+        except pikepdf.PasswordError:
+            if not password:
+                return None
+            pdf = pikepdf.open(path, password=password)
+        with pdf:
+            pdf.save(buffer, object_stream_mode=pikepdf.ObjectStreamMode.generate)
+        return buffer.getvalue()
+    except Exception as exc:
+        log.debug("could not repair %s for preview: %s", path, exc)
+        return None
 
 
 def _worker_compress_task(task: tuple[str, str, dict]) -> FileCompressionResult:

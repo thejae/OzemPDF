@@ -179,6 +179,23 @@ def build_tiny_pdf(path: Path) -> Path:
     return path
 
 
+def build_truncated_pdf(path: Path, *, source: Path | None = None) -> Path:
+    """A document that lost its cross-reference table and trailer.
+
+    Every object survives; only the lookup table is gone, which is what a
+    half-written or badly finalised file looks like. PDFium requires the table
+    and refuses the document, while qpdf scans the objects and rebuilds one —
+    the class the inspector's repaired-copy fallback exists for (N-13).
+    """
+    build_ui_pdf(source or path)
+    raw = (source or path).read_bytes()
+    cut = raw.rfind(b"\nxref")
+    if cut <= 0:
+        raise RuntimeError("fixture has no cross-reference table to remove")
+    path.write_bytes(raw[:cut] + b"\n")
+    return path
+
+
 def build_bilevel_pdf(path: Path) -> Path:
     """A page drawn entirely through a 1-bit DeviceGray mask."""
     pdf = pikepdf.new()

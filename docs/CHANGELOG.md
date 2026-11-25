@@ -4,6 +4,32 @@ All notable changes to OzemPDF are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.7 — 2026-11-25
+
+### Fixed
+
+- **The inspector no longer goes dark after a compression run.** PDFium (through pypdfium2) is not
+  thread-safe, and the inspector asks for the original and the slimmed page on two connections at
+  once while the thumbnail pool renders in parallel. Two overlapping renders corrupted PDFium's
+  global state, after which *every* later page render returned nothing: `/api/page` answered 404 for
+  both halves and the wipe canvas stayed black for the rest of the session (the packaged app's
+  `main.log` recorded `_serve_page`'s `render_failed` for both). Every PDFium call now runs under
+  one module lock, and `test_page_renders_are_serialized_for_pdfium` pins the invariant rather than
+  the timing of a race.
+- **Page previews now render damaged files that qpdf can still reconstruct.** PDFium demands an
+  intact cross-reference table; a half-written or badly finalised PDF (the reported signed form was
+  truncated mid-object) was refused, so both halves of the inspector stayed dark even though the
+  document compressed normally. The renderer re-saves such a document through qpdf into memory and
+  renders that copy — nothing on disk is touched
+  (`test_truncated_pdf_renders_from_a_repaired_copy`).
+- **The preview uses the document password.** `/api/page` rendered the original with the empty
+  password, so a password-protected PDF previewed as a dark empty stage even after a successful run.
+  The row now keeps the credential in memory (never persisted, never in the queue JSON) and both the
+  page endpoint and the thumbnail pool pass it
+  (`test_inspector_renders_protected_pages_after_a_password`).
+- **A page that truly cannot be rendered says so.** The inspector shows a localized notice over the
+  canvas instead of a silent dark void, so a rendering gap cannot be mistaken for a damaged file.
+
 ## 0.3.6 — 2026-11-25
 
 ### Fixed

@@ -1363,21 +1363,41 @@
     return layer;
   }
 
+  function showInspectorNotice(message) {
+    const notice = $('#inspectorNotice');
+    if (!notice) return;
+    notice.textContent = message;
+    notice.hidden = false;
+  }
+
+  function clearInspectorNotice() {
+    const notice = $('#inspectorNotice');
+    if (!notice) return;
+    notice.hidden = true;
+    notice.textContent = '';
+  }
+
   function loadInspectorPage() {
     if (!insp.item) return;
     const base = `/api/page?id=${encodeURIComponent(insp.id)}&page=${insp.page}&zoom=${insp.zoom}`;
     const orig = inspectorLayer('origImg', 'stackOrig');
     const slim = inspectorLayer('slimImg', 'stackSlim');
+    clearInspectorNotice();
     orig.onload = () => {
       insp.imgW = orig.naturalWidth;
       insp.imgH = orig.naturalHeight;
       centerInspector();
     };
+    // A page the engine cannot rasterise must say so instead of leaving the
+    // dark canvas looking broken.
+    orig.onerror = () => showInspectorNotice(t('inspector.render_failed'));
     orig.src = `${base}&side=orig&t=${Date.now()}`;
     if (insp.hasSlim) {
       slim.style.visibility = 'visible';
+      slim.onerror = () => showInspectorNotice(t('inspector.render_failed'));
       slim.src = `${base}&side=slim&t=${Date.now()}`;
     } else {
+      slim.onerror = null;
       slim.removeAttribute('src');
       slim.style.visibility = 'hidden';
     }

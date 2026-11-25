@@ -188,7 +188,8 @@
     "vectors_crisp": "Vectors 100% crisp",
     "badge_original": "ORIGINAL {size}",
     "badge_slim": "SLIMMED {size} · −{percent}%",
-    "wiped": "Wipe position {percent}%"
+    "wiped": "Wipe position {percent}%",
+    "render_failed": "This page could not be rendered. The file itself is unchanged."
   },
   "dialogs": {
     "close": "Close",
